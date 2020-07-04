@@ -1,0 +1,12 @@
+nix:
+  packages:
+    - zlib
+    - postgresql
+
+resolver: lts-13.21
+
+packages:
+  - .
+
+extra-deps:
+  - postgresql-query-3.7.0

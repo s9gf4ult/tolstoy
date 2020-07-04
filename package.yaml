@@ -1,0 +1,31 @@
+name:                tolstoy
+version:             0.1.0.0
+github:              "githubuser/tolstoy"
+license:             BSD3
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2020 Author name here"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+description:         Please see the README on GitHub at <https://github.com/githubuser/tolstoy#readme>
+
+dependencies:
+  - base >= 4.7 && < 5
+  - postgresql-query
+
+library:
+  source-dirs: src
+
+tests:
+  tolstoy-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - tolstoy
