@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ece55ae145fc5823c68406ce62563ac2fcbe9c3fb552ec53ef3eaab576e876aa
+-- hash: 89fc223c5c9faea4b9258ac4bde3d01abc630eefd63beafc41f4f9bf04af971a
 
 name:           tolstoy
-version:        0.1.0.0
+version:        0.0.1
 description:    Please see the README on GitHub at <https://github.com/githubuser/tolstoy#readme>
 homepage:       https://github.com/githubuser/tolstoy#readme
 bug-reports:    https://github.com/githubuser/tolstoy/issues
@@ -41,6 +41,7 @@ library
     , postgresql-query
     , postgresql-simple
     , text
+    , time
   default-language: Haskell2010
 
 test-suite tolstoy-test
@@ -61,5 +62,6 @@ test-suite tolstoy-test
     , postgresql-query
     , postgresql-simple
     , text
+    , time
     , tolstoy
   default-language: Haskell2010

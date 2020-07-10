@@ -1,5 +1,5 @@
 name:                tolstoy
-version:             0.1.0.0
+version:             0.0.1
 github:              "githubuser/tolstoy"
 license:             BSD3
 author:              "Author name here"
@@ -20,6 +20,7 @@ dependencies:
   - postgresql-query
   - postgresql-simple
   - text
+  - time
 
 default-extensions:
   - ConstraintKinds
