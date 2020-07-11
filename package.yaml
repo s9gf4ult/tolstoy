@@ -19,8 +19,10 @@ dependencies:
   - lens
   - postgresql-query
   - postgresql-simple
+  - resource-pool
   - text
   - time
+  - uuid-types
 
 default-extensions:
   - ConstraintKinds

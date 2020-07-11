@@ -4,10 +4,11 @@ CREATE TABLE documents (
   created_at         timestamp with time zone DEFAULT NOW() NOT NULL,
 );
 
-CREATE TABLE history (
+CREATE TABLE actions (
   id                 uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  document_id        uuid NOT NULL REFERENCES documents(id),
   created_at         timestamp with time zone DEFAULT NOW() NOT NULL,
-  seqnum             bigserial NOT NULL,
+  seqnum             bigserial NOT NULL UNIQUE,
   -- Seqnum is a seqence number to select the last version of each
   -- document very fast.
   parrent_id         uuid NOT NULL REFERENCES history(id) UNIQUE,
