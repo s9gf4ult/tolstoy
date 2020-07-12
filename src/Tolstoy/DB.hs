@@ -15,17 +15,22 @@ import GHC.Stack
 
 type Error = Text
 
-type DocAction doc act = doc -> act -> Either Error doc
+type DocAction doc act a = doc -> act -> Either Error (doc, a)
+
+type PureDocAction doc act = DocAction doc act ()
+
+pureDocAction :: (doc -> act -> Either Error doc) -> PureDocAction doc act
+pureDocAction f doc act = (,()) <$> f doc act
 
 newtype Seqnum = Seqnum
   { unSeqnum :: Integer
   } deriving (Eq, Ord, Show, FromField, ToField, Generic)
 
-newtype DocId = DocId
+newtype DocId doc = DocId
   { unDocId :: UUID
   } deriving (Eq, Ord, Show, Generic, FromField, ToField, FromJSON, ToJSON)
 
-newtype ActId = ActId
+newtype ActId act = ActId
   { unActId :: UUID
   } deriving (Eq, Ord, Show, Generic, FromField, ToField, FromJSON, ToJSON)
 
@@ -43,16 +48,16 @@ type JSON a = (FromJSON a, ToJSON a, Typeable a)
 
 data DocDesc doc act = DocDesc
   { doc      :: JsonField doc
-  , docId    :: DocId
+  , docId    :: DocId doc
   , act      :: JsonField act
-  , actId    :: ActId
+  , actId    :: ActId act
   , created  :: UTCTime
   , modified :: UTCTime
   } deriving (Eq, Ord, Show, Generic)
 
 instance (JSON doc, JSON act) => FromRow (DocDesc doc act)
 
-data Tolstoy m doc act = Tolstoy
+data Tolstoy m doc act a = Tolstoy
   { newDoc
     :: doc
     -- ^ Initial state of the doc.
@@ -62,31 +67,31 @@ data Tolstoy m doc act = Tolstoy
     -> m (DocDesc doc act)
   -- ^ Inserts a new document in DB
   , getDoc
-    :: DocId
+    :: DocId doc
     -> m (Maybe (DocDesc doc act))
   -- ^ Get last version of some object
   , changeDoc
     :: DocDesc doc act
     -> act
-    -> m (Either Error (DocDesc doc act))
+    -> m (Either Error ((DocDesc doc act), a))
   -- ^ Saves changed doc to the DB. Note that it does not check the
   -- document history consistency right now.
   , documentsList :: SqlBuilder
   } deriving (Generic)
 
-data TolstoyInit doc act = TolstoyInit
-  { docAction      :: DocAction doc act
+data TolstoyInit doc act a = TolstoyInit
+  { docAction      :: DocAction doc act a
   , documentsTable :: FN
   , actionsTable   :: FN
   } deriving (Generic)
 
 tolstoy
-  :: forall m doc act
+  :: forall m doc act a
   .  ( MonadPostgres m
      , MonadFail m              -- FIXME: KILL it
      , JSON doc, JSON act)
-  => (TolstoyInit doc act)
-  -> Tolstoy m doc act
+  => (TolstoyInit doc act a)
+  -> Tolstoy m doc act a
 tolstoy init =
   Tolstoy { newDoc, getDoc, changeDoc, documentsList }
   where
@@ -128,7 +133,7 @@ tolstoy init =
         _         -> error "Unexpected count of results"
     changeDoc docDesc act = case docAction init (unJsonField $ doc docDesc) act of
       Left e       -> return $ Left e
-      Right newDoc -> do
+      Right (newDoc, a) -> do
         [(newActId, newMod)] <- pgQuery [sqlExp|
           INSERT INTO ^{actionsTable init} (parent_id, document, action)
           VALUES ( #{actId docDesc}, #{JsonField newDoc}, #{JsonField act})
@@ -144,4 +149,4 @@ tolstoy init =
             , actId    = newActId
             , created  = created docDesc
             , modified = newMod }
-        return $ Right res
+        return $ Right (res, a)

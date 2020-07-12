@@ -8,10 +8,6 @@ import Database.PostgreSQL.Query
 import GHC.Generics (Generic)
 import Tolstoy.DB
 
-newtype UserId = UserId
-  { unUserId :: Integer
-  } deriving (Eq, Ord, Show, Generic, FromField, ToField)
-
 data User = User
   { name   :: Maybe Text
   , email  :: Text
@@ -39,16 +35,16 @@ data UserAction
 instance ToJSON UserAction
 instance FromJSON UserAction
 
-userAction :: DocAction User UserAction
-userAction user = \case
+userAction :: PureDocAction User UserAction
+userAction = pureDocAction $ \user -> \case
   SetName name -> do
-    checkStatus
+    checkStatus user
     return $ user & field @"name" .~ Just name
   Confirm -> do
-    checkStatus
+    checkStatus user
     return $ user & field @"status" .~ Confirmed
   Ban -> return $ user & field @"status" .~ Banned
   where
-    checkStatus = case status user of
+    checkStatus user = case status user of
       Banned -> Left "User is banned"
       _      -> pure ()
