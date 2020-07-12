@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e6e77bb18408632c934242a9e996273652b3774b9bab45c8e7f3d18b3d3c2fb0
+-- hash: d7e2a5ba3d4482712b48ce142f72b59a00fc0e37350c4869211b3cfc3ffb4be3
 
 name:           tolstoy
 version:        0.0.1
@@ -36,6 +36,7 @@ library
   build-depends:
       aeson
     , base >=4.7 && <5
+    , containers
     , generic-lens
     , lens
     , postgresql-query
@@ -59,6 +60,7 @@ test-suite tolstoy-test
   build-depends:
       aeson
     , base >=4.7 && <5
+    , containers
     , generic-lens
     , lens
     , postgresql-query
