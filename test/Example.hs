@@ -3,9 +3,11 @@ module Example where
 import Control.Lens
 import Data.Aeson
 import Data.Generics.Product
+import Data.Pool (Pool)
 import Data.Text as T
 import Database.PostgreSQL.Query
 import GHC.Generics (Generic)
+import Test.Tasty
 import Tolstoy.DB
 
 data User = User
@@ -26,8 +28,15 @@ data UserStatus
 instance ToJSON UserStatus
 instance FromJSON UserStatus
 
+initUser :: User
+initUser = User
+  { name   = Nothing
+  , email  = "user@email"
+  , status = Registered }
+
 data UserAction
   = SetName Text
+  | SetEmail Text
   | Confirm
   | Ban
   deriving (Eq, Ord, Show, Generic)
@@ -40,6 +49,9 @@ userAction = pureDocAction $ \user -> \case
   SetName name -> do
     checkStatus user
     return $ user & field @"name" .~ Just name
+  SetEmail e -> do
+    checkStatus user
+    return $ user & field @"email" .~ e
   Confirm -> do
     checkStatus user
     return $ user & field @"status" .~ Confirmed
@@ -48,3 +60,13 @@ userAction = pureDocAction $ \user -> \case
     checkStatus user = case status user of
       Banned -> Left "User is banned"
       _      -> pure ()
+
+openDB :: IO (Pool Connection)
+openDB = error "FIXME: openDB not implemented"
+
+closeDB :: Pool Connection -> IO ()
+closeDB = error "FIXME: closeDB not implemented"
+
+test_UserActions :: TestTree
+test_UserActions = withResource openDB closeDB $ \pool ->
+  testGroup "UserActions" [ error "fuck" ]

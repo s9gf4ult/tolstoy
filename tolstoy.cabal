@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d7e2a5ba3d4482712b48ce142f72b59a00fc0e37350c4869211b3cfc3ffb4be3
+-- hash: c58ae2480c6bf3787b57fca22bb715203e0b42f3e14a97be27edb8a66926e791
 
 name:           tolstoy
 version:        0.0.1
@@ -66,6 +66,9 @@ test-suite tolstoy-test
     , postgresql-query
     , postgresql-simple
     , resource-pool
+    , tasty
+    , tasty-discover
+    , tasty-hunit
     , text
     , time
     , tolstoy
