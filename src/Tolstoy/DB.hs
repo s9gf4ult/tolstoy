@@ -42,14 +42,15 @@ instance (ToJSON a) => ToField (JsonField a) where
 type JSON a = (FromJSON a, ToJSON a, Typeable a)
 
 data DocDesc doc act = DocDesc
-  { doc      :: doc
+  { doc      :: JsonField doc
   , docId    :: DocId
-  , act      :: act
+  , act      :: JsonField act
   , actId    :: ActId
-  , seqnum   :: Seqnum
   , created  :: UTCTime
   , modified :: UTCTime
   } deriving (Eq, Ord, Show, Generic)
+
+instance (JSON doc, JSON act) => FromRow (DocDesc doc act)
 
 data Tolstoy m doc act = Tolstoy
   { newDoc
@@ -70,6 +71,7 @@ data Tolstoy m doc act = Tolstoy
     -> m (Either Error (DocDesc doc act))
   -- ^ Saves changed doc to the DB. Note that it does not check the
   -- document history consistency right now.
+  , documentsList :: SqlBuilder
   } deriving (Generic)
 
 data TolstoyInit doc act = TolstoyInit
@@ -86,56 +88,60 @@ tolstoy
   => (TolstoyInit doc act)
   -> Tolstoy m doc act
 tolstoy init =
-  Tolstoy { newDoc, getDoc, changeDoc }
+  Tolstoy { newDoc, getDoc, changeDoc, documentsList }
   where
     docs = documentsTable
+    documentsList = [sqlExp|SELECT
+      act.document as doc,
+      doc.id as doc_id,
+      act.action as act,
+      act.id ad act_id,
+      doc.created_at as created,
+      act.created_at as modified
+      FROM ^{documentsTable init} as doc
+        INNER JOIN ^{actionsTable init} as act ON doc.action_id = act.id
+      |]
     newDoc doc act = do
-      [(docId, created)] <- pgQuery
-        [sqlExp|INSERT INTO ^{documentsTable init} RETURNING id, created_at|]
-      [(actId, modified, seqnum)] <- pgQuery
-        [sqlExp|INSERT INTO ^{actionsTable init} (document_id, document, action)
-                VALUES ( #{docId}, #{JsonField doc}, #{JsonField act} )
-                RETURNING id, created_at, seqnum|]
+      [Only actId] <- pgQuery [sqlExp|
+        INSERT INTO ^{actionsTable init} (document, action)
+        VALUES ( #{JsonField doc}, #{JsonField act} )
+        RETURNING id|]
+      [(docId, created)] <- pgQuery [sqlExp|
+        INSERT INTO ^{documentsTable init} (action_id)
+        VALUES ( #{actId} )
+        RETURNING id, created_at|]
       let
-        res = DocDesc { doc, docId, act, actId, seqnum, created, modified }
+        res = DocDesc
+          { doc = JsonField doc
+          , docId
+          , act = JsonField act
+          , actId
+          , created
+          , modified = created }
       return res
     getDoc docId = do
-      res <- pgQuery
-        [sqlExp|SELECT
-        doc.id as doc_id,
-        doc.created_at as created,
-        act.id as act_id,
-        act.created_at as modified,
-        act.seqnum,
-        act.document,
-        act.action
-        FROM ^{documentsTable init} as doc INNER JOIN ^{actionsTable init} as act
-          ON doc.id = act.document_id
-        WHERE doc.id = #{docId}
-        |]
+      res <- pgQuery [sqlExp|
+        SELECT * FROM (^{documentsList}) where doc_id = #{docId}|]
       case res of
-        [] -> return Nothing
-        [( docId
-         , created
-         , actId
-         , modified
-         , seqnum
-         , JsonField doc
-         , JsonField act)] -> return $ Just $ DocDesc {..}
-    changeDoc docDesc act = case docAction init (doc docDesc) act of
-      Left e -> return $ Left e
+        []        -> return Nothing
+        [docDesc] -> return $ Just docDesc
+        _         -> error "Unexpected count of results"
+    changeDoc docDesc act = case docAction init (unJsonField $ doc docDesc) act of
+      Left e       -> return $ Left e
       Right newDoc -> do
-        res <- pgQuery [sqlExp|
-          INSERT INTO ^{actionsTable init} (document_id, parent_id, document, action)
-          VALUES (#{docId docDesc}, #{actId docDesc}, #{JsonField newDoc}, #{JsonField act})
-          RETURNING id, created_at, seqnum|]
-        case res of
-          [(newActId, newMod, newSeq)] -> return $ Right $ DocDesc
-            { doc      = newDoc
+        [(newActId, newMod)] <- pgQuery [sqlExp|
+          INSERT INTO ^{actionsTable init} (parent_id, document, action)
+          VALUES ( #{actId docDesc}, #{JsonField newDoc}, #{JsonField act})
+          RETURNING id, created_at|]
+        1 <- pgExecute [sqlExp|UPDATE ^{documentsTable init}
+          SET action_id = #{newActId}
+          WHERE id = #{docId docDesc}|]
+        let
+          res =  DocDesc
+            { doc      = JsonField newDoc
             , docId    = docId docDesc
-            , act      = act
+            , act      = JsonField act
             , actId    = newActId
-            , seqnum   = newSeq
             , created  = created docDesc
-            , modified = newMod
-            }
+            , modified = newMod }
+        return $ Right res

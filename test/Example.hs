@@ -1,12 +1,12 @@
 module Example where
 
-import           Control.Lens
-import           Data.Aeson
-import           Data.Generics.Product
-import           Data.Text                 as T
-import           Database.PostgreSQL.Query
-import           GHC.Generics              (Generic)
-import           Tolstoy.DB
+import Control.Lens
+import Data.Aeson
+import Data.Generics.Product
+import Data.Text as T
+import Database.PostgreSQL.Query
+import GHC.Generics (Generic)
+import Tolstoy.DB
 
 newtype UserId = UserId
   { unUserId :: Integer
@@ -39,7 +39,7 @@ data UserAction
 instance ToJSON UserAction
 instance FromJSON UserAction
 
-userAction :: Action User UserAction
+userAction :: DocAction User UserAction
 userAction user = \case
   SetName name -> do
     checkStatus
