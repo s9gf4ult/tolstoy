@@ -17,10 +17,12 @@ dependencies:
   - aeson
   - containers
   - generic-lens
+  - vector
   - lens
   - postgresql-query
   - postgresql-simple
   - resource-pool
+  - scientific
   - text
   - time
   - uuid-types

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c58ae2480c6bf3787b57fca22bb715203e0b42f3e14a97be27edb8a66926e791
+-- hash: 7eb56cde541de41b0ef56c911f4f378d11b396abc0a926e7773577549fd06346
 
 name:           tolstoy
 version:        0.0.1
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Tolstoy.DB
+      Tolstoy.Migration
   other-modules:
       Paths_tolstoy
   hs-source-dirs:
@@ -42,9 +43,11 @@ library
     , postgresql-query
     , postgresql-simple
     , resource-pool
+    , scientific
     , text
     , time
     , uuid-types
+    , vector
   default-language: Haskell2010
 
 test-suite tolstoy-test
@@ -66,6 +69,7 @@ test-suite tolstoy-test
     , postgresql-query
     , postgresql-simple
     , resource-pool
+    , scientific
     , tasty
     , tasty-discover
     , tasty-hunit
@@ -73,4 +77,5 @@ test-suite tolstoy-test
     , time
     , tolstoy
     , uuid-types
+    , vector
   default-language: Haskell2010
