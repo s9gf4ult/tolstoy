@@ -8,6 +8,7 @@ import Control.Monad.Logger
 import Control.Monad.Trans.Class
 import Data.Aeson
 import Data.Generics.Product
+import Data.List.NonEmpty as NE
 import Data.Pool as Pool
 import Data.Text as T
 import Database.PostgreSQL.Query as PG
@@ -104,8 +105,15 @@ createAndRead
 createAndRead t = do
   let user = User Nothing "wow@such.email" Registered
   desc <- newDoc t user Init
-  newDesc <- getDoc t (desc ^. field @"docId")
-  liftIO $ assertEqual "Fail" (Just desc) newDesc
+  let did = desc ^. field @"docId"
+  newDesc <- getDoc t did
+  liftIO $ assertEqual "getDoc" (Just desc) newDesc
+  Just hist <- getDocHistory t did
+  let story :| [] = hist ^. field @"history"
+  liftIO $ assertEqual "getHist.doc" (desc ^. field @"doc") (story ^. field @"doc")
+  liftIO $ assertEqual "getHist.act" (desc ^. field @"act") (story ^. field @"act")
+  liftIO $ assertEqual "getHist.actId" (desc ^. field @"actId") (story ^. field @"actId")
+
 
 test_UserActions :: TestTree
 test_UserActions = Test.withResource openDB closeDB $ \res ->

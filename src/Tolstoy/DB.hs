@@ -89,7 +89,7 @@ data Story doc act = Story
 data ActionRow doc act = ActionRow
   { actionId :: ActId act
   , created  :: UTCTime
-  , parentId :: ActId act
+  , parentId :: Maybe (ActId act)
   , document :: doc
   , action   :: act
   } deriving (Eq, Ord, Show, Generic)
@@ -112,7 +112,8 @@ actionsHistory a actions = NE.nonEmpty $ go a
   where
     go actId = case M.lookup actId actMap of
       Nothing -> []
-      Just h  -> toStory h : (go $ h ^. field @"parentId")
+      Just h  -> toStory h
+        : (h ^.. field @"parentId" . _Just . to go . traversed)
     toStory h = Story
       { doc = h ^. field @"document"
       , act = h ^. field @"action"
@@ -144,16 +145,18 @@ data Tolstoy m doc act a = Tolstoy
     -> m (Either Error ((DocDesc doc act), a))
   -- ^ Saves changed doc to the DB. Note that it does not check the
   -- document history consistency right now.
-  , queries :: TolstoyQueries
+  , queries :: TolstoyQueries doc act
   } deriving (Generic)
 
-data TolstoyQueries = TolstoyQueries
+data TolstoyQueries doc act = TolstoyQueries
   { deploy        :: SqlBuilder
   -- ^ Deploy tables to the database
   , revert        :: SqlBuilder
   -- ^ Revert tables (drop em)
   , documentsList :: SqlBuilder
   -- ^ List of latest versions of documents
+  , actionsList   :: ActId act -> SqlBuilder
+  -- ^ Get action id to get started from
   } deriving (Generic)
 
 data TolstoyInit doc act a = TolstoyInit
@@ -175,14 +178,14 @@ tolstoy init =
   Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, queries }
   where
     docs = documentsTable
-    queries =
-      let
+    queries = TolstoyQueries { deploy, revert, documentsList, actionsList }
+      where
         documents = documentsTable init
         actions = actionsTable init
         documentsList = $(sqlExpFile "listDocuments")
         deploy = $(sqlExpFile "deploy")
         revert = $(sqlExpFile "revert")
-      in  TolstoyQueries { documentsList, deploy, revert }
+        actionsList actId = $(sqlExpFile "actionsList")
     newDoc doc act = do
       [(actId, modified)] <- pgQuery [sqlExp|
         INSERT INTO ^{actionsTable init} (document, action)
@@ -210,16 +213,7 @@ tolstoy init =
       case res of
         [] -> return Nothing
         [(created, actId)] -> do
-          actions <- pgQuery [sqlExp|
-            WITH RECURSIVE result(id, created_at, parrent_id, document, action) AS (
-              SELECT id, created_at, parrent_id, document, action
-              FROM ^{actionsTable init}
-              WHERE id = #{actId}
-            UNION ALL
-              SELECT act.id, act.created_at, act.parrent_id, act.document, act.action
-              FROM ^{actionsTable init} AS act INNER JOIN result AS res
-                ON res.parrent_id = act.id
-            ) SELECT * FROM result |]
+          actions <- pgQuery $ actionsList queries actId
           case actionsHistory actId actions of
             Nothing      -> error "No actions. Unexpected result"
             Just history -> return $ Just
