@@ -144,7 +144,16 @@ data Tolstoy m doc act a = Tolstoy
     -> m (Either Error ((DocDesc doc act), a))
   -- ^ Saves changed doc to the DB. Note that it does not check the
   -- document history consistency right now.
+  , queries :: TolstoyQueries
+  } deriving (Generic)
+
+data TolstoyQueries = TolstoyQueries
+  { deploy        :: SqlBuilder
+  -- ^ Deploy tables to the database
+  , revert        :: SqlBuilder
+  -- ^ Revert tables (drop em)
   , documentsList :: SqlBuilder
+  -- ^ List of latest versions of documents
   } deriving (Generic)
 
 data TolstoyInit doc act a = TolstoyInit
@@ -157,40 +166,48 @@ tolstoy
   :: forall m doc act a
   .  ( MonadPostgres m
      , MonadFail m              -- FIXME: KILL it
-     , JSON doc, JSON act)
+     , JSON doc, JSON act
+     , HasCallStack
+     )
   => (TolstoyInit doc act a)
   -> Tolstoy m doc act a
 tolstoy init =
-  Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, documentsList }
+  Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, queries }
   where
     docs = documentsTable
-    documentsList = [sqlExp|SELECT
-      act.document as doc,
-      doc.id as doc_id,
-      act.action as act,
-      act.id ad act_id,
-      doc.created_at as created,
-      act.created_at as modified
-      FROM ^{documentsTable init} as doc
-        INNER JOIN ^{actionsTable init} as act ON doc.action_id = act.id
-      |]
+    queries =
+      let
+        documents = documentsTable init
+        actions = actionsTable init
+        documentsList = [sqlExp|SELECT
+          act.document as doc,
+          doc.id as doc_id,
+          act.action as act,
+          act.id as act_id,
+          doc.created_at as created,
+          act.created_at as modified
+          FROM ^{documents} as doc
+            INNER JOIN ^{actions} as act ON doc.action_id = act.id
+          |]
+        deploy = $(sqlExpFile "deploy")
+        revert = $(sqlExpFile "revert")
+      in  TolstoyQueries { documentsList, deploy, revert }
     newDoc doc act = do
-      [Only actId] <- pgQuery [sqlExp|
+      [(actId, modified)] <- pgQuery [sqlExp|
         INSERT INTO ^{actionsTable init} (document, action)
         VALUES ( #{JsonField doc}, #{JsonField act} )
-        RETURNING id|]
+        RETURNING id, created_at|]
       [(docId, created)] <- pgQuery [sqlExp|
         INSERT INTO ^{documentsTable init} (action_id)
         VALUES ( #{actId} )
         RETURNING id, created_at|]
       let
         res = DocDesc
-          { doc , docId , act , actId , created
-          , modified = created }
+          { doc , docId , act , actId , created, modified }
       return res
     getDoc docId = do
       res <- pgQuery [sqlExp|
-        SELECT * FROM (^{documentsList}) where doc_id = #{docId}|]
+        SELECT * FROM (^{documentsList queries}) as docs where doc_id = #{docId}|]
       case res of
         []        -> return Nothing
         [docDesc] -> return $ Just docDesc

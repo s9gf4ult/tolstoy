@@ -13,7 +13,6 @@ import Data.Text as T
 import Database.PostgreSQL.Query as PG
 import Database.PostgreSQL.Simple as PG
 import GHC.Generics (Generic)
--- import Test.HUnit
 import Test.Tasty as Test
 import Test.Tasty.HUnit as Test
 import Tolstoy.DB
@@ -70,20 +69,27 @@ userAction = pureDocAction $ \user -> \case
       Banned -> Left "User is banned"
       _      -> pure ()
 
--- | All parameters will be taken from env variables by @libpq@
-openDB :: IO (Pool Connection)
-openDB = createPool (PG.connectPostgreSQL "") PG.close 1 1 1
-
-runTest :: IO (Pool Connection) -> TestMonad a -> IO a
-runTest p' t = do
-  p <- p'
+runTest :: Pool Connection -> TestMonad a -> IO a
+runTest p t = do
   runStderrLoggingT $ Pool.withResource p $ \con -> runPgMonadT con t
 
-closeDB :: Pool Connection -> IO ()
-closeDB p = runTest (pure p) $ do
-  void $ pgExecute [sqlExp|drop table documents|]
-  void $ pgExecute [sqlExp|drop table actions|]
+closeDB :: (Testoy, Pool Connection) -> IO ()
+closeDB (tlst, p) = runTest p $ do
+  void $ pgExecute $ tlst ^. field @"queries" . field @"revert"
 
+-- | All parameters will be taken from env variables by @libpq@
+openDB :: IO (Testoy, Pool Connection)
+openDB = do
+  p <- createPool (PG.connectPostgreSQL "") PG.close 1 1 1
+  let
+    tlst :: Testoy
+    tlst = tolstoy $ TolstoyInit
+      { docAction = userAction
+      , documentsTable = "documents"
+      , actionsTable = "actions" }
+  void $ runTest p $ do
+    pgExecute $ tlst ^. field @"queries" . field @"deploy"
+  return (tlst, p)
 
 type TestMonad = PgMonadT (LoggingT IO)
 
@@ -102,15 +108,11 @@ createAndRead t = do
   liftIO $ assertEqual "Fail" (Just desc) newDesc
 
 test_UserActions :: TestTree
-test_UserActions = Test.withResource openDB (const $ return ()) $ \pool ->
+test_UserActions = Test.withResource openDB closeDB $ \res ->
   let
-    tlst :: Testoy
-    tlst = tolstoy $ TolstoyInit
-      { docAction = userAction
-      , documentsTable = "documents"
-      , actionsTable = "actions"
-      }
     exec :: TestName -> (Testoy -> TestMonad ()) -> TestTree
-    exec n ma = testCase n $ runTest pool $ ma tlst
+    exec n ma = testCase n $ do
+      (tlst, pool) <- res
+      runTest pool $ ma tlst
   in testGroup "UserActions"
      [ exec "Create and read" createAndRead ]
