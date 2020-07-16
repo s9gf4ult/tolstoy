@@ -73,7 +73,10 @@ tests:
       - -with-rtsopts=-N
 
     dependencies:
-      - tolstoy
+      - monad-logger
+      - HUnit
       - tasty
       - tasty-discover
       - tasty-hunit
+      - tolstoy
+      - transformers
