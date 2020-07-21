@@ -1,11 +1,16 @@
 module Tolstoy.Migration where
 
+import           Data.Aeson (Value, (.=))
+import qualified Data.Aeson as J
+import           Data.Aeson.Types (Pair)
+import           Data.Functor ((<$>))
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Scientific
 import           Data.Text as T
 import qualified Data.Vector as V
 import           GHC.TypeLits
+import           Prelude (error, mconcat, pure, ($), (++))
 import qualified Prelude as P
 
 -- | Kind for describing the structure of the document
@@ -38,9 +43,78 @@ data TaggedListRep :: [(Symbol, Structure)] -> * where
     -> TaggedListRep tail
     -> TaggedListRep ('(t, s) ': tail)
 
+instance J.ToJSON (StructureRep s) where
+  toJSON s = J.object $ mconcat
+    [ pure $ "type" .= stype
+    , ("argument" .=) <$> larg
+    , ("tags" .=) <$> tags
+    ]
+    where
+      stype :: Text
+      stype = case s of
+        StringRep      -> "string"
+        NumberRep      -> "number"
+        BoolRep        -> "bool"
+        NullRep        -> "null"
+        OptionalRep {} -> "optional"
+        VectorRep {}   -> "vector"
+        SumRep    {}   -> "sum"
+        ProductRep {}  -> "product"
+      larg :: [Value]
+      larg = case s of
+        OptionalRep sub -> pure $ J.toJSON sub
+        VectorRep sub   -> pure $ J.toJSON sub
+        _               -> []
+      tags :: [Value]
+      tags = case s of
+        SumRep l     -> pure $ J.object $ taggedListJson l
+        ProductRep l -> pure $ J.object $ taggedListJson l
+        _            -> []
+
+taggedListJson :: TaggedListRep l -> [Pair]
+taggedListJson = \case
+  TaggedListNil -> []
+  TaggedListCons p rep tail ->
+    ((T.pack $ symbolVal p) .= rep)
+    : taggedListJson tail
+
 -- | Materialize any structure type to it's representation
 class KnownStructure (s :: Structure) where
   structureRep :: StructureRep s
+
+instance KnownStructure String where
+  structureRep = StringRep
+
+instance KnownStructure Number where
+  structureRep = NumberRep
+
+instance KnownStructure Bool where
+  structureRep = BoolRep
+
+instance KnownStructure Null where
+  structureRep = NullRep
+
+instance (KnownStructure s) => KnownStructure (Optional s) where
+  structureRep = OptionalRep structureRep
+
+instance (KnownStructure s) => KnownStructure (Vector s) where
+  structureRep = VectorRep structureRep
+
+instance (KnownTaggedList l) => KnownStructure (Sum l) where
+  structureRep = SumRep taggedListRep
+
+instance (KnownTaggedList l) => KnownStructure (Product l) where
+  structureRep = ProductRep taggedListRep
+
+class KnownTaggedList (l :: [(Symbol, Structure)]) where
+  taggedListRep :: TaggedListRep l
+
+instance KnownTaggedList '[] where
+  taggedListRep = TaggedListNil
+
+instance (KnownTaggedList tail, KnownStructure s, KnownSymbol t)
+  => KnownTaggedList ('(t, s) ': tail) where
+  taggedListRep = TaggedListCons (Proxy @t) structureRep taggedListRep
 
 data StructureValue :: Structure -> * where
   StringValue   :: Text -> StructureValue String
