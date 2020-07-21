@@ -10,10 +10,13 @@ import Data.Aeson
 import Data.Generics.Product
 import Data.List.NonEmpty as NE
 import Data.Pool as Pool
+import Data.Set as S
 import Data.Text as T
+import Data.Traversable
 import Database.PostgreSQL.Query as PG
 import Database.PostgreSQL.Simple as PG
 import GHC.Generics (Generic)
+import Prelude as P
 import Test.Tasty as Test
 import Test.Tasty.HUnit as Test
 import Tolstoy.DB
@@ -99,9 +102,7 @@ instance MonadFail TestMonad where
 
 type Testoy = Tolstoy TestMonad User UserAction ()
 
-createAndRead
-  :: Tolstoy TestMonad User UserAction ()
-  -> TestMonad ()
+createAndRead :: Testoy -> TestMonad ()
 createAndRead t = do
   let user = User Nothing "wow@such.email" Registered
   desc <- newDoc t user Init
@@ -114,6 +115,32 @@ createAndRead t = do
   liftIO $ assertEqual "getHist.act" (desc ^. field @"act") (story ^. field @"act")
   liftIO $ assertEqual "getHist.actId" (desc ^. field @"actId") (story ^. field @"actId")
 
+listAndChange :: Testoy -> TestMonad ()
+listAndChange t = do
+  let
+    users = ["user1", "user2", "user3"] <&> \e ->
+      User Nothing e Registered
+  insertDescs <- for users $ \u -> newDoc t u Init
+  gotDescs <- listDocuments t
+  let
+    s1 = S.fromList insertDescs
+    s2 = S.fromList gotDescs
+  liftIO $ assertEqual "intersect 3" 3 (S.size $ S.intersection s1 s2)
+  void $ changeDoc t (P.head insertDescs) Ban
+  newDocs <- listDocuments t
+  liftIO $ assertEqual "intersect 2" 2
+    (S.size $ S.intersection s1 $ S.fromList newDocs)
+
+changeSingleDoc :: Testoy -> TestMonad ()
+changeSingleDoc t = do
+  userDesc <- newDoc t (User Nothing "Wow@user.com" Registered) Init
+  let n = "Lupa"
+  Right (named, ()) <- changeDoc t userDesc $ SetName n
+  liftIO $ assertEqual "Name set" (Just n)
+    $ named ^. field @"doc" . field @"name"
+  Right (confirmed, ()) <- changeDoc t named Confirm
+  liftIO $ assertEqual "Status confirmed" Confirmed
+    $ confirmed ^. field @"doc" . field @"status"
 
 test_UserActions :: TestTree
 test_UserActions = Test.withResource openDB closeDB $ \res ->
@@ -123,4 +150,7 @@ test_UserActions = Test.withResource openDB closeDB $ \res ->
       (tlst, pool) <- res
       runTest pool $ ma tlst
   in testGroup "UserActions"
-     [ exec "Create and read" createAndRead ]
+     [ exec "Create and read" createAndRead
+     , exec "List several documents and see list changes" listAndChange
+     , exec "Change single doc and see it changes" changeSingleDoc
+     ]

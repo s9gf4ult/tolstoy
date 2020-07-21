@@ -145,6 +145,8 @@ data Tolstoy m doc act a = Tolstoy
     -> m (Either Error ((DocDesc doc act), a))
   -- ^ Saves changed doc to the DB. Note that it does not check the
   -- document history consistency right now.
+  , listDocuments :: m [DocDesc doc act]
+  -- ^ List all docs in DB. Might be not very useful in practice
   , queries :: TolstoyQueries doc act
   } deriving (Generic)
 
@@ -175,7 +177,7 @@ tolstoy
   => (TolstoyInit doc act a)
   -> Tolstoy m doc act a
 tolstoy init =
-  Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, queries }
+  Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments, queries }
   where
     docs = documentsTable
     queries = TolstoyQueries { deploy, revert, documentsList, actionsList }
@@ -241,3 +243,4 @@ tolstoy init =
             , created  = docDesc ^. field @"created"
             , modified = newMod }
         return $ Right (res, a)
+    listDocuments = pgQuery (queries ^. field @"documentsList")
