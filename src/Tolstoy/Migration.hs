@@ -1,16 +1,19 @@
+{-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
+
 module Tolstoy.Migration where
 
-import           Data.Aeson (Value, (.=))
+import           Data.Aeson (FromJSON(..), ToJSON(..), Value, (.:), (.=))
 import qualified Data.Aeson as J
-import           Data.Aeson.Types (Pair)
+import           Data.Aeson.Types (Pair, Parser)
 import           Data.Functor ((<$>))
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Scientific
-import           Data.Text as T
+import           Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Vector as V
 import           GHC.TypeLits
-import           Prelude (error, mconcat, pure, ($), (++))
+import           Prelude (error, fail, mconcat, pure, ($), (++), (==))
 import qualified Prelude as P
 
 -- | Kind for describing the structure of the document
@@ -146,3 +149,92 @@ data ProductValueL :: [(Symbol, Structure)] -> * where
     -> StructureValue s
     -> ProductValueL tail
     -> ProductValueL ('(t, s) ': tail)
+
+instance ToJSON (StructureValue s) where
+  toJSON = \case
+    StringValue t   -> toJSON t
+    NumberValue s   -> toJSON s
+    BoolValue b     -> toJSON b
+    NullValue       -> J.Null
+    OptionalValue v -> toJSON v
+    VectorValue v   -> toJSON v
+    SumValue l      -> J.object $ sumValueJson l
+    ProductValue l  -> J.object $ productValueJson l
+
+sumValueJson :: SumValueL l -> [Pair]
+sumValueJson = \case
+  ThisValue t s ->
+    [ "tag"   .= (T.pack $ symbolVal t)
+    , "value" .= s ]
+  ThatValue that -> sumValueJson that
+
+productValueJson :: ProductValueL l -> [Pair]
+productValueJson = \case
+  ProductNil -> []
+  ProductCons t s tail -> ((T.pack $ symbolVal t) .= s)
+    : productValueJson tail
+
+instance FromJSON (StructureValue 'String) where
+  parseJSON v = StringValue <$> parseJSON v
+
+instance FromJSON (StructureValue Number) where
+  parseJSON v = NumberValue <$> parseJSON v
+
+instance FromJSON (StructureValue Bool) where
+  parseJSON v = BoolValue <$> parseJSON v
+
+instance FromJSON (StructureValue Null) where
+  parseJSON = \case
+    J.Null -> pure NullValue
+    _ -> fail "Null expected"
+
+instance (FromJSON (StructureValue s))
+  => FromJSON (StructureValue (Optional s)) where
+  parseJSON v = OptionalValue <$> parseJSON v
+
+instance (FromJSON (StructureValue s))
+  => FromJSON (StructureValue (Vector s)) where
+  parseJSON v = VectorValue <$> parseJSON v
+
+instance (FromObject (SumValueL l))
+  => FromJSON (StructureValue (Sum l)) where
+  parseJSON v = SumValue <$> J.withObject "SumValue" parseObject v
+
+instance (FromObject (ProductValueL l))
+  => FromJSON (StructureValue (Product l)) where
+  parseJSON v = ProductValue <$> J.withObject "SumValue" parseObject v
+
+class FromObject a where
+  parseObject :: J.Object -> Parser a
+
+instance FromObject (ProductValueL '[]) where
+  parseObject _ = pure ProductNil
+
+instance
+  ( KnownSymbol t
+  , FromJSON (StructureValue s)
+  , FromObject (ProductValueL tail) )
+  => FromObject (ProductValueL ( '(t, s)  ': tail )) where
+  parseObject o = do
+    let p = Proxy @t
+    v <- o .: (T.pack $ symbolVal p)
+    tail <- parseObject o
+    pure $ ProductCons p v tail
+
+instance
+  ( KnownSymbol t
+  , FromJSON (StructureValue s)
+  , FromObject (SumValueL tail) )
+  => FromObject (SumValueL ( '(t, s)  ': tail )) where
+  parseObject o = do
+    let p = Proxy @t
+    tag <- o .: "tag"
+    if tag == (T.pack $ symbolVal p)
+      then do
+      value <- o .: "value"
+      pure $ ThisValue p value
+      else do
+      parseObject o
+
+instance FromObject (SumValueL '[]) where
+  parseObject o = fail "Tag not found"

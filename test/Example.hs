@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module Example where
 
 import Control.Lens
@@ -5,7 +7,6 @@ import Control.Monad
 import Control.Monad.Fail
 import Control.Monad.IO.Class
 import Control.Monad.Logger
-import Control.Monad.Trans.Class
 import Data.Aeson
 import Data.Generics.Product
 import Data.List.NonEmpty as NE
@@ -58,6 +59,7 @@ instance FromJSON UserAction
 
 userAction :: PureDocAction User UserAction
 userAction = pureDocAction $ \user -> \case
+  Init         -> return user
   SetName name -> do
     checkStatus user
     return $ user & field @"name" .~ Just name

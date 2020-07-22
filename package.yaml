@@ -15,9 +15,9 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
   - base >= 4.7 && < 5
   - aeson
+  - bytestring
   - containers
   - generic-lens
-  - vector
   - lens
   - postgresql-query
   - postgresql-simple
@@ -26,6 +26,8 @@ dependencies:
   - text
   - time
   - uuid-types
+  - vector
+  - vinyl
 
 default-extensions:
   - ConstraintKinds
@@ -59,6 +61,9 @@ default-extensions:
   - TypeOperators
   - UndecidableInstances
   - ViewPatterns
+
+ghc-options:
+  - -Wall
 
 library:
   source-dirs: src

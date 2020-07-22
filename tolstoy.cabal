@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8aaf088677602a9b243cba4828976d1da9ea3a0aff2e1b9cbd07166763d7e1aa
+-- hash: 32490d13f1e8ae78a59604db1388fbd9d0d1405c08067deff0fa495097a3127c
 
 name:           tolstoy
 version:        0.0.1
@@ -34,9 +34,11 @@ library
   hs-source-dirs:
       src
   default-extensions: ConstraintKinds DataKinds DeriveFoldable DeriveFunctor DeriveGeneric DeriveTraversable DuplicateRecordFields FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NumDecimals OverloadedStrings PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeFamilies TypeOperators UndecidableInstances ViewPatterns
+  ghc-options: -Wall
   build-depends:
       aeson
     , base >=4.7 && <5
+    , bytestring
     , containers
     , generic-lens
     , lens
@@ -48,6 +50,7 @@ library
     , time
     , uuid-types
     , vector
+    , vinyl
   default-language: Haskell2010
 
 test-suite tolstoy-test
@@ -59,10 +62,11 @@ test-suite tolstoy-test
   hs-source-dirs:
       test
   default-extensions: ConstraintKinds DataKinds DeriveFoldable DeriveFunctor DeriveGeneric DeriveTraversable DuplicateRecordFields FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NumDecimals OverloadedStrings PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeFamilies TypeOperators UndecidableInstances ViewPatterns
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
     , base >=4.7 && <5
+    , bytestring
     , containers
     , generic-lens
     , lens
@@ -80,4 +84,5 @@ test-suite tolstoy-test
     , transformers
     , uuid-types
     , vector
+    , vinyl
   default-language: Haskell2010
