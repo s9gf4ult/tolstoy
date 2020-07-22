@@ -84,3 +84,5 @@ tests:
       - tasty-hunit
       - tolstoy
       - transformers
+    build-tools:
+      - autoexporter

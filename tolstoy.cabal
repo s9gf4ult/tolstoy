@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d4edfbdc908013a70ccd260f5066878e2ce14484c92bee29e89d43be544d6e04
+-- hash: 852a5bc41a41c4b9d8ed4e5e3d0faf5f8bf5fa0ee8ee03ac33ebc3a4906dd172
 
 name:           tolstoy
 version:        0.0.1
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Tolstoy.DB
+      Tolstoy.Structure
       Tolstoy.Structure.Class
       Tolstoy.Structure.Kind
       Tolstoy.Structure.Rep
@@ -66,6 +67,8 @@ test-suite tolstoy-test
       test
   default-extensions: ConstraintKinds DataKinds DeriveFoldable DeriveFunctor DeriveGeneric DeriveTraversable DuplicateRecordFields FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NumDecimals OverloadedStrings PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeFamilies TypeOperators UndecidableInstances ViewPatterns
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-tool-depends:
+      autoexporter:autoexporter
   build-depends:
       aeson
     , base >=4.7 && <5
