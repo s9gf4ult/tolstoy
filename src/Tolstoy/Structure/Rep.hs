@@ -16,14 +16,14 @@ import qualified Prelude as P
 import           Tolstoy.Structure.Kind
 
 data StructureRep :: Structure -> * where
-  StringRep   :: StructureRep String
-  NumberRep   :: StructureRep Number
-  BoolRep     :: StructureRep Bool
-  NullRep     :: StructureRep Null
-  OptionalRep :: StructureRep s -> StructureRep (Optional s)
-  VectorRep   :: StructureRep s -> StructureRep (Vector s)
-  SumRep      :: TaggedListRep l -> StructureRep (Sum l)
-  ProductRep  :: TaggedListRep l -> StructureRep (Product l)
+  StringRep   :: StructureRep StructString
+  NumberRep   :: StructureRep StructNumber
+  BoolRep     :: StructureRep StructBool
+  NullRep     :: StructureRep StructNull
+  OptionalRep :: StructureRep s -> StructureRep (StructOptional s)
+  VectorRep   :: StructureRep s -> StructureRep (StructVector s)
+  SumRep      :: TaggedListRep l -> StructureRep (StructSum l)
+  ProductRep  :: TaggedListRep l -> StructureRep (StructProduct l)
 
 data TaggedListRep :: [(Symbol, Structure)] -> * where
   TaggedListNil :: TaggedListRep '[]
@@ -73,28 +73,28 @@ taggedListJson = \case
 class KnownStructure (s :: Structure) where
   structureRep :: StructureRep s
 
-instance KnownStructure String where
+instance KnownStructure StructString where
   structureRep = StringRep
 
-instance KnownStructure Number where
+instance KnownStructure StructNumber where
   structureRep = NumberRep
 
-instance KnownStructure Bool where
+instance KnownStructure StructBool where
   structureRep = BoolRep
 
-instance KnownStructure Null where
+instance KnownStructure StructNull where
   structureRep = NullRep
 
-instance (KnownStructure s) => KnownStructure (Optional s) where
+instance (KnownStructure s) => KnownStructure (StructOptional s) where
   structureRep = OptionalRep structureRep
 
-instance (KnownStructure s) => KnownStructure (Vector s) where
+instance (KnownStructure s) => KnownStructure (StructVector s) where
   structureRep = VectorRep structureRep
 
-instance (KnownTaggedList l) => KnownStructure (Sum l) where
+instance (KnownTaggedList l) => KnownStructure (StructSum l) where
   structureRep = SumRep taggedListRep
 
-instance (KnownTaggedList l) => KnownStructure (Product l) where
+instance (KnownTaggedList l) => KnownStructure (StructProduct l) where
   structureRep = ProductRep taggedListRep
 
 class KnownTaggedList (l :: [(Symbol, Structure)]) where

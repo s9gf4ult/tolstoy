@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8fb658e89ea074f65b37b8112c979e83bd02bc0eff578a88f150ee5b1c8d4d6e
+-- hash: d4edfbdc908013a70ccd260f5066878e2ce14484c92bee29e89d43be544d6e04
 
 name:           tolstoy
 version:        0.0.1
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Tolstoy.DB
+      Tolstoy.Structure.Class
       Tolstoy.Structure.Kind
       Tolstoy.Structure.Rep
       Tolstoy.Structure.Value

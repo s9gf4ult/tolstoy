@@ -17,14 +17,14 @@ import qualified Prelude as P
 import           Tolstoy.Structure.Kind
 
 data StructureValue :: Structure -> * where
-  StringValue   :: Text -> StructureValue String
-  NumberValue   :: Scientific -> StructureValue Number
-  BoolValue     :: P.Bool -> StructureValue Bool
-  NullValue     :: StructureValue Null
-  OptionalValue :: Maybe (StructureValue s) -> StructureValue (Optional s)
-  VectorValue   :: V.Vector (StructureValue s) -> StructureValue (Vector s)
-  SumValue      :: SumValueL l -> StructureValue (Sum l)
-  ProductValue  :: ProductValueL l -> StructureValue (Product l)
+  StringValue   :: Text -> StructureValue StructString
+  NumberValue   :: Scientific -> StructureValue StructNumber
+  BoolValue     :: P.Bool -> StructureValue StructBool
+  NullValue     :: StructureValue StructNull
+  OptionalValue :: Maybe (StructureValue s) -> StructureValue (StructOptional s)
+  VectorValue   :: V.Vector (StructureValue s) -> StructureValue (StructVector s)
+  SumValue      :: SumValueL l -> StructureValue (StructSum l)
+  ProductValue  :: ProductValueL l -> StructureValue (StructProduct l)
 
 data SumValueL :: [(Symbol, Structure)] -> * where
   ThisValue
@@ -71,34 +71,34 @@ productValueJson = \case
   ProductCons t s tail -> ((T.pack $ symbolVal t) .= s)
     : productValueJson tail
 
-instance FromJSON (StructureValue 'String) where
+instance FromJSON (StructureValue 'StructString) where
   parseJSON v = StringValue <$> parseJSON v
 
-instance FromJSON (StructureValue Number) where
+instance FromJSON (StructureValue StructNumber) where
   parseJSON v = NumberValue <$> parseJSON v
 
-instance FromJSON (StructureValue Bool) where
+instance FromJSON (StructureValue StructBool) where
   parseJSON v = BoolValue <$> parseJSON v
 
-instance FromJSON (StructureValue Null) where
+instance FromJSON (StructureValue StructNull) where
   parseJSON = \case
     J.Null -> pure NullValue
     _ -> fail "Null expected"
 
 instance (FromJSON (StructureValue s))
-  => FromJSON (StructureValue (Optional s)) where
+  => FromJSON (StructureValue (StructOptional s)) where
   parseJSON v = OptionalValue <$> parseJSON v
 
 instance (FromJSON (StructureValue s))
-  => FromJSON (StructureValue (Vector s)) where
+  => FromJSON (StructureValue (StructVector s)) where
   parseJSON v = VectorValue <$> parseJSON v
 
 instance (FromObject (SumValueL l))
-  => FromJSON (StructureValue (Sum l)) where
+  => FromJSON (StructureValue (StructSum l)) where
   parseJSON v = SumValue <$> J.withObject "SumValue" parseObject v
 
 instance (FromObject (ProductValueL l))
-  => FromJSON (StructureValue (Product l)) where
+  => FromJSON (StructureValue (StructProduct l)) where
   parseJSON v = ProductValue <$> J.withObject "SumValue" parseObject v
 
 class FromObject a where
