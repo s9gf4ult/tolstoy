@@ -1,42 +1,39 @@
+{-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
+
 module Tolstoy.Structure.Value where
 
-
-import           Data.Aeson (FromJSON(..), ToJSON(..), Value, (.:), (.=))
-import qualified Data.Aeson as J
+import           Data.Aeson
 import           Data.Aeson.Types (Pair, Parser)
-import           Data.Functor ((<$>))
-import           Data.Maybe
 import           Data.Proxy
 import           Data.Scientific
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Vector as V
+import           Data.Vector (Vector)
 import           GHC.TypeLits
-import           Prelude (error, fail, mconcat, pure, ($), (++), (==))
-import qualified Prelude as P
 import           Tolstoy.Structure.Kind
+
 
 data StructureValue :: Structure -> * where
   StringValue   :: Text -> StructureValue StructString
   NumberValue   :: Scientific -> StructureValue StructNumber
-  BoolValue     :: P.Bool -> StructureValue StructBool
+  BoolValue     :: Bool -> StructureValue StructBool
   NullValue     :: StructureValue StructNull
   OptionalValue :: Maybe (StructureValue s) -> StructureValue (StructOptional s)
-  VectorValue   :: V.Vector (StructureValue s) -> StructureValue (StructVector s)
+  VectorValue   :: Vector (StructureValue s) -> StructureValue (StructVector s)
   SumValue      :: SumValueL l -> StructureValue (StructSum l)
   ProductValue  :: ProductValueL l -> StructureValue (StructProduct l)
 
 data SumValueL :: [(Symbol, Structure)] -> * where
   ThisValue
-    :: forall t s tail
+    :: forall t s rest
     .  (KnownSymbol t)
     => Proxy t
     -> StructureValue s
-    -> SumValueL ('(t, s) ': tail)
+    -> SumValueL ('(t, s) ': rest)
   ThatValue
-    :: forall h tail
-    .  SumValueL tail
-    -> SumValueL (h ': tail)
+    :: forall h rest
+    .  SumValueL rest
+    -> SumValueL (h ': rest)
 
 data ProductValueL :: [(Symbol, Structure)] -> * where
   ProductNil :: ProductValueL '[]
@@ -44,19 +41,19 @@ data ProductValueL :: [(Symbol, Structure)] -> * where
     :: (KnownSymbol t)
     => Proxy t
     -> StructureValue s
-    -> ProductValueL tail
-    -> ProductValueL ('(t, s) ': tail)
+    -> ProductValueL rest
+    -> ProductValueL ('(t, s) ': rest)
 
 instance ToJSON (StructureValue s) where
   toJSON = \case
     StringValue t   -> toJSON t
     NumberValue s   -> toJSON s
     BoolValue b     -> toJSON b
-    NullValue       -> J.Null
+    NullValue       -> Null
     OptionalValue v -> toJSON v
     VectorValue v   -> toJSON v
-    SumValue l      -> J.object $ sumValueJson l
-    ProductValue l  -> J.object $ productValueJson l
+    SumValue l      -> object $ sumValueJson l
+    ProductValue l  -> object $ productValueJson l
 
 sumValueJson :: SumValueL l -> [Pair]
 sumValueJson = \case
@@ -68,8 +65,8 @@ sumValueJson = \case
 productValueJson :: ProductValueL l -> [Pair]
 productValueJson = \case
   ProductNil -> []
-  ProductCons t s tail -> ((T.pack $ symbolVal t) .= s)
-    : productValueJson tail
+  ProductCons t s rest -> ((T.pack $ symbolVal t) .= s)
+    : productValueJson rest
 
 instance FromJSON (StructureValue 'StructString) where
   parseJSON v = StringValue <$> parseJSON v
@@ -82,7 +79,7 @@ instance FromJSON (StructureValue StructBool) where
 
 instance FromJSON (StructureValue StructNull) where
   parseJSON = \case
-    J.Null -> pure NullValue
+    Null -> pure NullValue
     _ -> fail "Null expected"
 
 instance (FromJSON (StructureValue s))
@@ -95,14 +92,14 @@ instance (FromJSON (StructureValue s))
 
 instance (FromObject (SumValueL l))
   => FromJSON (StructureValue (StructSum l)) where
-  parseJSON v = SumValue <$> J.withObject "SumValue" parseObject v
+  parseJSON v = SumValue <$> withObject "SumValue" parseObject v
 
 instance (FromObject (ProductValueL l))
   => FromJSON (StructureValue (StructProduct l)) where
-  parseJSON v = ProductValue <$> J.withObject "SumValue" parseObject v
+  parseJSON v = ProductValue <$> withObject "SumValue" parseObject v
 
 class FromObject a where
-  parseObject :: J.Object -> Parser a
+  parseObject :: Object -> Parser a
 
 instance FromObject (ProductValueL '[]) where
   parseObject _ = pure ProductNil
@@ -110,19 +107,19 @@ instance FromObject (ProductValueL '[]) where
 instance
   ( KnownSymbol t
   , FromJSON (StructureValue s)
-  , FromObject (ProductValueL tail) )
-  => FromObject (ProductValueL ( '(t, s)  ': tail )) where
+  , FromObject (ProductValueL rest) )
+  => FromObject (ProductValueL ( '(t, s)  ': rest )) where
   parseObject o = do
     let p = Proxy @t
     v <- o .: (T.pack $ symbolVal p)
-    tail <- parseObject o
-    pure $ ProductCons p v tail
+    rest <- parseObject o
+    pure $ ProductCons p v rest
 
 instance
   ( KnownSymbol t
   , FromJSON (StructureValue s)
-  , FromObject (SumValueL tail) )
-  => FromObject (SumValueL ( '(t, s)  ': tail )) where
+  , FromObject (SumValueL rest) )
+  => FromObject (SumValueL ( '(t, s)  ': rest )) where
   parseObject o = do
     let p = Proxy @t
     tag <- o .: "tag"

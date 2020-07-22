@@ -1,18 +1,13 @@
+{-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
+
 module Tolstoy.Structure.Rep where
 
-import           Data.Aeson (FromJSON(..), ToJSON(..), Value, (.:), (.=))
-import qualified Data.Aeson as J
-import           Data.Aeson.Types (Pair, Parser)
-import           Data.Functor ((<$>))
-import           Data.Maybe
+import           Data.Aeson
+import           Data.Aeson.Types (Pair)
 import           Data.Proxy
-import           Data.Scientific
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Vector as V
 import           GHC.TypeLits
-import           Prelude (error, fail, mconcat, pure, ($), (++), (==))
-import qualified Prelude as P
 import           Tolstoy.Structure.Kind
 
 data StructureRep :: Structure -> * where
@@ -31,11 +26,11 @@ data TaggedListRep :: [(Symbol, Structure)] -> * where
     :: (KnownSymbol t)
     => Proxy t
     -> StructureRep s
-    -> TaggedListRep tail
-    -> TaggedListRep ('(t, s) ': tail)
+    -> TaggedListRep rest
+    -> TaggedListRep ('(t, s) ': rest)
 
-instance J.ToJSON (StructureRep s) where
-  toJSON s = J.object $ mconcat
+instance ToJSON (StructureRep s) where
+  toJSON s = object $ mconcat
     [ pure $ "type" .= stype
     , ("argument" .=) <$> larg
     , ("tags" .=) <$> tags
@@ -53,21 +48,21 @@ instance J.ToJSON (StructureRep s) where
         ProductRep {}  -> "product"
       larg :: [Value]
       larg = case s of
-        OptionalRep sub -> pure $ J.toJSON sub
-        VectorRep sub   -> pure $ J.toJSON sub
+        OptionalRep sub -> pure $ toJSON sub
+        VectorRep sub   -> pure $ toJSON sub
         _               -> []
       tags :: [Value]
       tags = case s of
-        SumRep l     -> pure $ J.object $ taggedListJson l
-        ProductRep l -> pure $ J.object $ taggedListJson l
+        SumRep l     -> pure $ object $ taggedListJson l
+        ProductRep l -> pure $ object $ taggedListJson l
         _            -> []
 
 taggedListJson :: TaggedListRep l -> [Pair]
 taggedListJson = \case
   TaggedListNil -> []
-  TaggedListCons p rep tail ->
+  TaggedListCons p rep rest ->
     ((T.pack $ symbolVal p) .= rep)
-    : taggedListJson tail
+    : taggedListJson rest
 
 -- | Materialize any structure type to it's representation
 class KnownStructure (s :: Structure) where
@@ -103,6 +98,6 @@ class KnownTaggedList (l :: [(Symbol, Structure)]) where
 instance KnownTaggedList '[] where
   taggedListRep = TaggedListNil
 
-instance (KnownTaggedList tail, KnownStructure s, KnownSymbol t)
-  => KnownTaggedList ('(t, s) ': tail) where
+instance (KnownTaggedList rest, KnownStructure s, KnownSymbol t)
+  => KnownTaggedList ('(t, s) ': rest) where
   taggedListRep = TaggedListCons (Proxy @t) structureRep taggedListRep
