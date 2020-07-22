@@ -18,6 +18,7 @@ import qualified Database.PostgreSQL.Simple.FromRow as PG
 import           Database.PostgreSQL.Simple.ToField
 import           GHC.Generics (Generic)
 import           GHC.Stack
+import           Tolstoy.Structure
 
 type Error = Text
 
@@ -50,7 +51,11 @@ instance (FromJSON a, Typeable a) => FromField (JsonField a) where
 instance (ToJSON a) => ToField (JsonField a) where
   toField = toJSONField . unJsonField
 
-type JSON a = (FromJSON a, ToJSON a, Typeable a)
+type StructuralJSON doc =
+  ( Structural doc
+  , Typeable (StructureValue (StructKind doc))
+  , FromJSON (StructureValue (StructKind doc))
+  , ToJSON (StructureValue (StructKind doc)) )
 
 data DocDesc doc act = DocDesc
   { doc      :: doc
@@ -61,11 +66,15 @@ data DocDesc doc act = DocDesc
   , modified :: UTCTime
   } deriving (Eq, Ord, Show, Generic)
 
-instance (JSON doc, JSON act) => FromRow (DocDesc doc act) where
+instance
+  (StructuralJSON doc, StructuralJSON act
+  ) => FromRow (DocDesc doc act) where
   fromRow = do
-    JsonField doc <- PG.field
+    JsonField docValue <- PG.field
+    let doc = fromStructValue docValue
     docId <- PG.field
-    JsonField act <- PG.field
+    JsonField actValue <- PG.field
+    let act = fromStructValue actValue
     actId <- PG.field
     created <- PG.field
     modified <- PG.field
@@ -94,13 +103,18 @@ data ActionRow doc act = ActionRow
   , action   :: act
   } deriving (Eq, Ord, Show, Generic)
 
-instance (JSON doc, JSON act) => FromRow (ActionRow doc act) where
+instance
+  ( StructuralJSON doc, StructuralJSON act
+  ) => FromRow (ActionRow doc act) where
   fromRow = do
     actionId <- PG.field
     created <- PG.field
     parentId <- PG.field
-    JsonField document <- PG.field
-    JsonField action <- PG.field
+    JsonField docVal  <- PG.field
+    JsonField actVal <- PG.field
+    let
+      document = fromStructValue docVal
+      action = fromStructValue actVal
     return $ ActionRow {..}
 
 actionsHistory
@@ -171,7 +185,7 @@ tolstoy
   :: forall m doc act a
   .  ( MonadPostgres m
      , MonadFail m              -- FIXME: KILL it
-     , JSON doc, JSON act
+     , StructuralJSON doc, StructuralJSON act
      , HasCallStack
      )
   => (TolstoyInit doc act a)
@@ -191,7 +205,8 @@ tolstoy init =
     newDoc doc act = do
       [(actId, modified)] <- pgQuery [sqlExp|
         INSERT INTO ^{actionsTable init} (document, action)
-        VALUES ( #{JsonField doc}, #{JsonField act} )
+        VALUES ( #{JsonField (toStructValue doc)}
+          , #{JsonField (toStructValue act)} )
         RETURNING id, created_at|]
       [(docId, created)] <- pgQuery [sqlExp|
         INSERT INTO ^{documentsTable init} (action_id)
@@ -229,7 +244,8 @@ tolstoy init =
           docId = docDesc ^. field @"docId"
         [(newActId, newMod)] <- pgQuery [sqlExp|
           INSERT INTO ^{actionsTable init} (parent_id, document, action)
-          VALUES ( #{parent}, #{JsonField newDoc}, #{JsonField act})
+          VALUES ( #{parent}, #{JsonField (toStructValue newDoc)}
+            , #{JsonField (toStructValue act)})
           RETURNING id, created_at|]
         1 <- pgExecute [sqlExp|UPDATE ^{documentsTable init}
           SET action_id = #{newActId}

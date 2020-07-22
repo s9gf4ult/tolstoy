@@ -7,10 +7,10 @@ import Control.Monad
 import Control.Monad.Fail
 import Control.Monad.IO.Class
 import Control.Monad.Logger
-import Data.Aeson
 import Data.Generics.Product
 import Data.List.NonEmpty as NE
 import Data.Pool as Pool
+import Data.Proxy
 import Data.Set as S
 import Data.Text as T
 import Data.Traversable
@@ -21,6 +21,7 @@ import Prelude as P
 import Test.Tasty as Test
 import Test.Tasty.HUnit as Test
 import Tolstoy.DB
+import Tolstoy.Structure
 
 data User = User
   { name   :: Maybe Text
@@ -28,8 +29,25 @@ data User = User
   , status :: UserStatus
   } deriving (Eq, Ord, Show, Generic)
 
-instance ToJSON User
-instance FromJSON User
+instance Structural User where
+  type StructKind User = 'StructProduct
+    '[ '("name", StructKind (Maybe Text))
+     , '("email", StructKind Text)
+     , '("status", StructKind UserStatus)
+     ]
+  toStructValue (User name email status) = ProductValue
+    $ ProductCons Proxy (toStructValue name)
+    $ ProductCons Proxy (toStructValue email)
+    $ ProductCons Proxy (toStructValue status)
+    ProductNil
+  fromStructValue
+    (ProductValue
+     (ProductCons _ name
+      (ProductCons _ email
+       (ProductCons _ status ProductNil)))) = User
+    (fromStructValue name)
+    (fromStructValue email)
+    (fromStructValue status)
 
 data UserStatus
   = Registered
@@ -37,8 +55,22 @@ data UserStatus
   | Banned
   deriving (Eq, Ord, Show, Generic)
 
-instance ToJSON UserStatus
-instance FromJSON UserStatus
+instance Structural UserStatus where
+  type StructKind UserStatus = 'StructSum
+    '[ '("registered", 'StructNull)
+     , '("confirmed", 'StructNull)
+     , '("banned", 'StructNull) ]
+  toStructValue = \case
+    Registered -> SumValue $ ThisValue (Proxy @"registered") NullValue
+    Confirmed -> SumValue $ ThatValue
+      $ ThisValue (Proxy @"confirmed") NullValue
+    Banned -> SumValue $ ThatValue $ ThatValue
+      $ ThisValue (Proxy @"banned") NullValue
+  fromStructValue (SumValue s) = case s of
+    ThisValue _ _                         -> Registered
+    ThatValue (ThisValue _ _)             -> Confirmed
+    ThatValue (ThatValue (ThisValue _ _)) -> Banned
+    ThatValue (ThatValue (ThatValue _))   -> error "Impossible happened"
 
 initUser :: User
 initUser = User
@@ -54,8 +86,29 @@ data UserAction
   | Ban
   deriving (Eq, Ord, Show, Generic)
 
-instance ToJSON UserAction
-instance FromJSON UserAction
+instance Structural UserAction where
+  type StructKind UserAction = 'StructSum
+    '[ '("init", 'StructNull )
+     , '("set_name", 'StructString )
+     , '("set_email", 'StructString )
+     , '("confirm", 'StructNull )
+     , '("ban", 'StructNull )
+     ]
+  toStructValue a = SumValue $ case a of
+    Init -> ThisValue Proxy NullValue
+    SetName n -> ThatValue $ ThisValue Proxy (toStructValue n)
+    SetEmail e -> ThatValue $ ThatValue $ ThisValue Proxy (toStructValue e)
+    Confirm -> ThatValue $ ThatValue $ ThatValue $ ThisValue Proxy NullValue
+    Ban -> ThatValue $ ThatValue $ ThatValue $ ThatValue
+      $ ThisValue Proxy NullValue
+  fromStructValue (SumValue s) = case s of
+    ThisValue _ _ -> Init
+    ThatValue (ThisValue _ n) -> SetName (fromStructValue n)
+    ThatValue (ThatValue (ThisValue _ e)) -> SetEmail (fromStructValue e)
+    ThatValue (ThatValue (ThatValue (ThisValue _ _))) -> Confirm
+    ThatValue (ThatValue (ThatValue (ThatValue (ThisValue _ _)))) -> Ban
+    ThatValue (ThatValue (ThatValue (ThatValue (ThatValue _)))) ->
+      error "Impossible happened"
 
 userAction :: PureDocAction User UserAction
 userAction = pureDocAction $ \user -> \case
