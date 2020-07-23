@@ -7,8 +7,9 @@ data Structure
   = StructString
   | StructNumber
   | StructBool
-  | StructNull
   | StructOptional Structure
   | StructVector Structure
   | StructSum [(Symbol, Structure)]
   | StructProduct [(Symbol, Structure)]
+
+type StructEmpty = 'StructProduct '[]

@@ -8,15 +8,12 @@ import           Data.Proxy
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           GHC.TypeLits
-import           Test.QuickCheck.Arbitrary
-import           Test.QuickCheck.Gen
 import           Tolstoy.Structure.Kind
 
 data StructureRep :: Structure -> * where
   StringRep   :: StructureRep StructString
   NumberRep   :: StructureRep StructNumber
   BoolRep     :: StructureRep StructBool
-  NullRep     :: StructureRep StructNull
   OptionalRep :: StructureRep s -> StructureRep (StructOptional s)
   VectorRep   :: StructureRep s -> StructureRep (StructVector s)
   SumRep      :: TaggedListRep l -> StructureRep (StructSum l)
@@ -31,32 +28,32 @@ data TaggedListRep :: [(Symbol, Structure)] -> * where
     -> TaggedListRep rest
     -> TaggedListRep ('(t, s) ': rest)
 
-data SomeStructureRep where
-  SomeStructureRep
-    :: forall s
-    . (ToJSON (StructureRep s))
-    => StructureRep s
-    -> SomeStructureRep
+-- data SomeStructureRep where
+--   SomeStructureRep
+--     :: forall s
+--     . (ToJSON (StructureRep s))
+--     => StructureRep s
+--     -> SomeStructureRep
 
-instance Arbitrary SomeStructureRep where
-  arbitrary = oneof
-    [ pure (SomeStructureRep StringRep)
-    , pure (SomeStructureRep NumberRep)
-    , pure (SomeStructureRep BoolRep)
-    , pure (SomeStructureRep NullRep)
-    , optRep
-    , vecRep
-    , sumRep
-    , prodRep ]
-    where
-      optRep = do
-        SomeStructureRep rep <- arbitrary
-        pure $ SomeStructureRep $ OptionalRep rep
-      vecRep = do
-        SomeStructureRep rep <- arbitrary
-        pure $ SomeStructureRep $ VectorRep rep
-      sumRep = (error "FIXME: not implemented")
-      prodRep = (error "FIXME: not implemented")
+-- instance Arbitrary SomeStructureRep where
+--   arbitrary = oneof
+--     [ pure (SomeStructureRep StringRep)
+--     , pure (SomeStructureRep NumberRep)
+--     , pure (SomeStructureRep BoolRep)
+--     , pure (SomeStructureRep NullRep)
+--     , optRep
+--     , vecRep
+--     , sumRep
+--     , prodRep ]
+--     where
+--       optRep = do
+--         SomeStructureRep rep <- arbitrary
+--         pure $ SomeStructureRep $ OptionalRep rep
+--       vecRep = do
+--         SomeStructureRep rep <- arbitrary
+--         pure $ SomeStructureRep $ VectorRep rep
+--       sumRep = (error "FIXME: not implemented")
+--       prodRep = (error "FIXME: not implemented")
 
 instance ToJSON (StructureRep s) where
   toJSON s = object $ mconcat
@@ -70,7 +67,6 @@ instance ToJSON (StructureRep s) where
         StringRep      -> "string"
         NumberRep      -> "number"
         BoolRep        -> "bool"
-        NullRep        -> "null"
         OptionalRep {} -> "optional"
         VectorRep {}   -> "vector"
         SumRep    {}   -> "sum"
@@ -105,9 +101,6 @@ instance KnownStructure StructNumber where
 
 instance KnownStructure StructBool where
   structureRep = BoolRep
-
-instance KnownStructure StructNull where
-  structureRep = NullRep
 
 instance (KnownStructure s) => KnownStructure (StructOptional s) where
   structureRep = OptionalRep structureRep

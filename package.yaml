@@ -16,7 +16,6 @@ dependencies:
   - base >= 4.7 && < 5
   - aeson
   - bytestring
-  - QuickCheck
   - containers
   - generic-lens
   - lens
@@ -79,10 +78,13 @@ tests:
       - -with-rtsopts=-N
 
     dependencies:
+      - QuickCheck
+      - generic-arbitrary
       - monad-logger
       - tasty
       - tasty-discover
       - tasty-hunit
+      - tasty-quickcheck
       - tolstoy
       - transformers
     build-tools:

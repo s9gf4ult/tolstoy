@@ -17,7 +17,6 @@ data StructureValue :: Structure -> * where
   StringValue   :: Text -> StructureValue StructString
   NumberValue   :: Scientific -> StructureValue StructNumber
   BoolValue     :: Bool -> StructureValue StructBool
-  NullValue     :: StructureValue StructNull
   OptionalValue :: Maybe (StructureValue s) -> StructureValue (StructOptional s)
   VectorValue   :: Vector (StructureValue s) -> StructureValue (StructVector s)
   SumValue      :: SumValueL l -> StructureValue (StructSum l)
@@ -44,12 +43,52 @@ data ProductValueL :: [(Symbol, Structure)] -> * where
     -> ProductValueL rest
     -> ProductValueL ('(t, s) ': rest)
 
+structEmpty :: StructureValue StructEmpty
+structEmpty = ProductValue ProductNil
+
+instance Eq (StructureValue 'StructString) where
+  (StringValue a) == (StringValue b) = a == b
+
+instance Show (StructureValue 'StructString) where
+  show (StringValue s) = "(StringValue " ++ show s ++ ")"
+
+instance Eq (StructureValue 'StructNumber) where
+  (NumberValue a) == (NumberValue b) = a == b
+
+instance Show (StructureValue 'StructNumber) where
+  show (NumberValue s) = "(NumberValue " ++ show s ++ ")"
+
+instance Eq (StructureValue 'StructBool) where
+  (BoolValue a) == (BoolValue b) = a == b
+
+instance Show (StructureValue 'StructBool) where
+  show (BoolValue s) = "(BoolValue " ++ show s ++ ")"
+
+instance
+  ( Eq (StructureValue s)
+  ) => Eq (StructureValue ('StructOptional s)) where
+  (OptionalValue a) == (OptionalValue b) = a == b
+
+instance
+  ( Show (StructureValue s)
+  ) => Show (StructureValue ('StructOptional s)) where
+  show (OptionalValue s) = "(OptionalValue (" ++ show s ++ "))"
+
+instance
+  ( Eq (StructureValue s)
+  ) => Eq (StructureValue ('StructVector s)) where
+  (VectorValue a) == (VectorValue b) = a == b
+
+instance
+  ( Show (StructureValue s)
+  ) => Show (StructureValue (StructVector s)) where
+  show (VectorValue s) = "(VectorValue " ++ show s ++ ")"
+
 instance ToJSON (StructureValue s) where
   toJSON = \case
     StringValue t   -> toJSON t
     NumberValue s   -> toJSON s
     BoolValue b     -> toJSON b
-    NullValue       -> Null
     OptionalValue v -> toJSON v
     VectorValue v   -> toJSON v
     SumValue l      -> object $ sumValueJson l
@@ -76,11 +115,6 @@ instance FromJSON (StructureValue StructNumber) where
 
 instance FromJSON (StructureValue StructBool) where
   parseJSON v = BoolValue <$> parseJSON v
-
-instance FromJSON (StructureValue StructNull) where
-  parseJSON = \case
-    Null -> pure NullValue
-    _ -> fail "Null expected"
 
 instance (FromJSON (StructureValue s))
   => FromJSON (StructureValue (StructOptional s)) where
@@ -128,7 +162,8 @@ instance
       value <- o .: "value"
       pure $ ThisValue p value
       else do
-      parseObject o
+      that <- parseObject o
+      pure $ ThatValue that
 
 instance FromObject (SumValueL '[]) where
   parseObject o = fail "Tag not found"

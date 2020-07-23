@@ -12,27 +12,49 @@ import Data.List.NonEmpty as NE
 import Data.Pool as Pool
 import Data.Proxy
 import Data.Set as S
+import Data.String
 import Data.Text as T
 import Data.Traversable
 import Database.PostgreSQL.Query as PG
 import Database.PostgreSQL.Simple as PG
 import GHC.Generics (Generic)
 import Prelude as P
+import Test.QuickCheck.Arbitrary
+import Test.QuickCheck.Arbitrary.Generic
+import Test.QuickCheck.Gen as Arb
 import Test.Tasty as Test
 import Test.Tasty.HUnit as Test
+import Test.Tasty.QuickCheck
 import Tolstoy.DB
 import Tolstoy.Structure
 
+newtype Name = Name
+  { unName :: Text
+  } deriving (Eq, Ord, Show, Generic, Structural, IsString)
+
+instance Arbitrary Name where
+  arbitrary = Arb.elements ["lupa", "pupa", "pepa"]
+
+newtype Email = Email
+  { unEmail :: Text
+  } deriving (Eq, Ord, Show, Generic, Structural, IsString)
+
+instance Arbitrary Email where
+  arbitrary = Arb.elements $ do
+    user <- ["user", "buzer", "muzer"]
+    host <- ["@example.com", "@super.mail", "@google.com"]
+    return $ Email $ user <> host
+
 data User = User
-  { name   :: Maybe Text
-  , email  :: Text
+  { name   :: Maybe Name
+  , email  :: Email
   , status :: UserStatus
   } deriving (Eq, Ord, Show, Generic)
 
 instance Structural User where
   type StructKind User = 'StructProduct
-    '[ '("name", StructKind (Maybe Text))
-     , '("email", StructKind Text)
+    '[ '("name", StructKind (Maybe Name))
+     , '("email", StructKind Email)
      , '("status", StructKind UserStatus)
      ]
   toStructValue (User name email status) = ProductValue
@@ -49,23 +71,30 @@ instance Structural User where
     (fromStructValue email)
     (fromStructValue status)
 
+instance Arbitrary User where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
+
 data UserStatus
   = Registered
   | Confirmed
   | Banned
   deriving (Eq, Ord, Show, Generic)
+instance Arbitrary UserStatus where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 instance Structural UserStatus where
   type StructKind UserStatus = 'StructSum
-    '[ '("registered", 'StructNull)
-     , '("confirmed", 'StructNull)
-     , '("banned", 'StructNull) ]
+    '[ '("registered", StructEmpty)
+     , '("confirmed", StructEmpty)
+     , '("banned", StructEmpty) ]
   toStructValue = \case
-    Registered -> SumValue $ ThisValue (Proxy @"registered") NullValue
+    Registered -> SumValue $ ThisValue (Proxy @"registered") structEmpty
     Confirmed -> SumValue $ ThatValue
-      $ ThisValue (Proxy @"confirmed") NullValue
+      $ ThisValue (Proxy @"confirmed") structEmpty
     Banned -> SumValue $ ThatValue $ ThatValue
-      $ ThisValue (Proxy @"banned") NullValue
+      $ ThisValue (Proxy @"banned") structEmpty
   fromStructValue (SumValue s) = case s of
     ThisValue _ _                         -> Registered
     ThatValue (ThisValue _ _)             -> Confirmed
@@ -80,27 +109,32 @@ initUser = User
 
 data UserAction
   = Init
-  | SetName Text
-  | SetEmail Text
+  | SetName Name
+  | SetEmail Email
   | Confirm
   | Ban
   deriving (Eq, Ord, Show, Generic)
 
+instance Arbitrary UserAction where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
+
 instance Structural UserAction where
   type StructKind UserAction = 'StructSum
-    '[ '("init", 'StructNull )
-     , '("set_name", 'StructString )
-     , '("set_email", 'StructString )
-     , '("confirm", 'StructNull )
-     , '("ban", 'StructNull )
+    '[ '("init", ('StructProduct '[]))
+     , '("set_name", 'StructString)
+     , '("set_email", 'StructString)
+     , '("confirm", ('StructProduct '[]))
+     , '("ban", ('StructProduct '[]))
      ]
   toStructValue a = SumValue $ case a of
-    Init -> ThisValue Proxy NullValue
+    Init -> ThisValue Proxy (ProductValue ProductNil)
     SetName n -> ThatValue $ ThisValue Proxy (toStructValue n)
     SetEmail e -> ThatValue $ ThatValue $ ThisValue Proxy (toStructValue e)
-    Confirm -> ThatValue $ ThatValue $ ThatValue $ ThisValue Proxy NullValue
+    Confirm -> ThatValue $ ThatValue $ ThatValue $ ThisValue Proxy
+      $ ProductValue ProductNil
     Ban -> ThatValue $ ThatValue $ ThatValue $ ThatValue
-      $ ThisValue Proxy NullValue
+      $ ThisValue Proxy $ ProductValue ProductNil
   fromStructValue (SumValue s) = case s of
     ThisValue _ _ -> Init
     ThatValue (ThisValue _ n) -> SetName (fromStructValue n)
@@ -197,15 +231,28 @@ changeSingleDoc t = do
   liftIO $ assertEqual "Status confirmed" Confirmed
     $ confirmed ^. field @"doc" . field @"status"
 
-test_UserActions :: TestTree
-test_UserActions = Test.withResource openDB closeDB $ \res ->
+pureTests :: TestTree
+pureTests = testGroup "Pure tests"
+  [ testProperty "Structural User" $ \(user :: User) ->
+      fromStructValue (toStructValue user) == user
+  , testProperty "Structural UserAction" $ \(act :: UserAction) ->
+      fromStructValue (toStructValue act) == act
+  ]
+
+ioTests :: TestTree
+ioTests = Test.withResource openDB closeDB $ \res ->
   let
     exec :: TestName -> (Testoy -> TestMonad ()) -> TestTree
     exec n ma = testCase n $ do
       (tlst, pool) <- res
       runTest pool $ ma tlst
-  in testGroup "UserActions"
+  in testGroup "IO tests"
      [ exec "Create and read" createAndRead
      , exec "List several documents and see list changes" listAndChange
      , exec "Change single doc and see it changes" changeSingleDoc
      ]
+
+test_UserActions :: TestTree
+test_UserActions = testGroup "Users example"
+  [ pureTests
+  , Test.after AllSucceed "Pure tests" ioTests ]

@@ -27,11 +27,6 @@ instance Structural Bool where
   toStructValue = BoolValue
   fromStructValue (BoolValue b) = b
 
-instance Structural () where
-  type StructKind () = 'StructNull
-  toStructValue () = NullValue
-  fromStructValue NullValue = ()
-
 instance (Structural s) => Structural (Maybe s) where
   type StructKind (Maybe s) = 'StructOptional (StructKind s)
   toStructValue v = OptionalValue $ toStructValue <$> v
