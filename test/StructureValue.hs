@@ -15,6 +15,7 @@ import Data.Set as S
 import Data.String
 import Data.Text as T
 import Data.Traversable
+import Data.Vector as V
 import Database.PostgreSQL.Query as PG
 import Database.PostgreSQL.Simple as PG
 import GHC.Generics (Generic)
@@ -30,9 +31,8 @@ import Tolstoy.Structure
 data SomeStructureValue where
   SomeStructureValue :: forall s.
     ( FromJSON (StructureValue s)
-    , ToJSON (StructureValue s)
     , Eq (StructureValue s)
-    , Show (StructureValue s)
+    , Arbitrary (StructureValue s)
     )
     => StructureValue s
     -> SomeStructureValue
@@ -63,28 +63,39 @@ arbScientific = realToFrac <$> (arbitrary :: Gen Double)
 instance Arbitrary SomeStructureValue where
   arbitrary = oneof allCases
     where
-      allCases = optNothing : noNothing
-      noNothing =
+      allCases =
         [ SomeStructureValue . StringValue <$> arbText
         , SomeStructureValue . NumberValue <$> arbScientific
         , SomeStructureValue . BoolValue <$> arbitrary
-        , optJust
+        , opt
+        , vec
+        , sum
+        , prod
         ]
-      optJust = do
-        SomeStructureValue s <- oneof noNothing
-        -- Just Nothing will be parsed like Nothing, so we omit those
-        -- cases
-        return $ SomeStructureValue $ OptionalValue $ Just s
-      optNothing = do
+      opt = do
+        SomeStructureValue s <- arbitrary
+        sub <- oneof [ pure $ Just s, pure Nothing ]
+        return $ SomeStructureValue $ OptionalValue sub
+      vec = do
         SomeStructureValue (_ :: StructureValue s) <- arbitrary
-        return $ SomeStructureValue $ OptionalValue
-          (Nothing :: Maybe (StructureValue s))
-
+        vec <- arbitrary :: Gen (Vector (StructureValue s))
+        return $ SomeStructureValue $ VectorValue vec
+      sum = do
+        SomeStructureValue (_ :: StructureValue s1) <- arbitrary
+        SomeStructureValue (_ :: StructureValue s2) <- arbitrary
+        sum <- arbitrary :: Gen (SumValueL '[ '("some", s1), '("other", s2) ])
+        return $ SomeStructureValue $ SumValue sum
+      prod = do
+        SomeStructureValue (_ :: StructureValue s1) <- arbitrary
+        SomeStructureValue (_ :: StructureValue s2) <- arbitrary
+        p <- arbitrary ::
+          Gen (ProductValueL '[ '("some", s1), '("other", s2) ])
+        return $ SomeStructureValue $ ProductValue p
 
 test_StructureValue :: TestTree
 test_StructureValue = testGroup "Pure tests"
   [ testProperty "ToJSON/FromJSON (StructureValue s)"
     $ \(s :: SomeStructureValue) -> case s of
       SomeStructureValue (v :: StructureValue s) ->
-        Just v == J.decode (J.encode v)
+        Just v === J.decode (J.encode v)
   ]
