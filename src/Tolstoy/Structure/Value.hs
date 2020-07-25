@@ -15,7 +15,6 @@ import           Test.QuickCheck.Gen
 import           Test.QuickCheck.Instances ()
 import           Tolstoy.Structure.Kind
 
-
 data StructureValue :: Structure -> * where
   StringValue   :: Text -> StructureValue StructString
   NumberValue   :: Scientific -> StructureValue StructNumber
@@ -65,6 +64,9 @@ productValueJson = \case
   ProductCons t s rest -> ((T.pack $ symbolVal t) .= s)
     : productValueJson rest
 
+showProxy :: (KnownSymbol s) => Proxy s -> String
+showProxy p = "(Proxy @\"" ++ symbolVal p ++ "\")"
+
 ---------------------------
 -- StructValue instances --
 ---------------------------
@@ -79,11 +81,19 @@ instance ToJSON (StructureValue s) where
     SumValue l      -> object $ sumValueJson l
     ProductValue l  -> object $ productValueJson l
 
+instance Show (StructureValue s) where
+  show = \case
+    StringValue t   -> "(StringValue " ++ show t ++ ")"
+    NumberValue s   -> "(NumberValue " ++ show s ++ ")"
+    BoolValue b     -> "(BoolValue " ++ show b ++ ")"
+    OptionalValue v -> "(OptionalValue (" ++ show v ++ "))"
+    VectorValue v   -> "(VectorValue " ++ show v ++ ")"
+    SumValue l      -> "(SumValue " ++ show l ++ ")"
+    ProductValue l  -> "(ProductValue " ++ show l ++ ")"
+
+
 instance Eq (StructureValue 'StructString) where
   (StringValue a) == (StringValue b) = a == b
-
-instance Show (StructureValue 'StructString) where
-  show (StringValue s) = "(StringValue " ++ show s ++ ")"
 
 instance Arbitrary (StructureValue 'StructString) where
   arbitrary = StringValue <$> arbitrary
@@ -94,9 +104,6 @@ instance FromJSON (StructureValue 'StructString) where
 instance Eq (StructureValue 'StructNumber) where
   (NumberValue a) == (NumberValue b) = a == b
 
-instance Show (StructureValue 'StructNumber) where
-  show (NumberValue s) = "(NumberValue " ++ show s ++ ")"
-
 instance Arbitrary (StructureValue 'StructNumber) where
   arbitrary = NumberValue <$> arbitrary
 
@@ -105,9 +112,6 @@ instance FromJSON (StructureValue StructNumber) where
 
 instance Eq (StructureValue 'StructBool) where
   (BoolValue a) == (BoolValue b) = a == b
-
-instance Show (StructureValue 'StructBool) where
-  show (BoolValue s) = "(BoolValue " ++ show s ++ ")"
 
 instance Arbitrary (StructureValue 'StructBool) where
   arbitrary = BoolValue <$> arbitrary
@@ -119,11 +123,6 @@ instance
   ( Eq (StructureValue s)
   ) => Eq (StructureValue ('StructOptional s)) where
   (OptionalValue a) == (OptionalValue b) = a == b
-
-instance
-  ( Show (StructureValue s)
-  ) => Show (StructureValue ('StructOptional s)) where
-  show (OptionalValue s) = "(OptionalValue (" ++ show s ++ "))"
 
 instance
   ( Arbitrary (StructureValue s)
@@ -141,11 +140,6 @@ instance
   (VectorValue a) == (VectorValue b) = a == b
 
 instance
-  ( Show (StructureValue s)
-  ) => Show (StructureValue (StructVector s)) where
-  show (VectorValue s) = "(VectorValue " ++ show s ++ ")"
-
-instance
   ( Arbitrary (StructureValue s)
   ) => Arbitrary (StructureValue ('StructVector s)) where
   arbitrary = VectorValue <$> arbitrary
@@ -159,11 +153,6 @@ instance
   ( Eq (SumValueL l)
   ) => Eq (StructureValue ('StructSum l)) where
   (SumValue a) == (SumValue b) = a == b
-
-instance
-  ( Show (SumValueL l)
-  ) => Show (StructureValue ('StructSum l)) where
-  show (SumValue s) = "(SumValue " ++ show s ++ ")"
 
 instance
   ( Arbitrary (SumValueL l)
@@ -180,12 +169,7 @@ instance
   (ProductValue a) == (ProductValue b) = a == b
 
 instance
-  ( Show (ProductValueL l)
-  ) => Show (StructureValue ('StructProduct l)) where
-  show (ProductValue s) = "(ProductValue " ++ show s ++ ")"
-
-instance
-  ( Arbitrary (ProductValueL s)
+  ( Arbitrary (ProductValueL l)
   ) => Arbitrary (StructureValue ('StructProduct l)) where
   arbitrary = ProductValue <$> arbitrary
 
@@ -198,7 +182,9 @@ instance (FromObject (ProductValueL l))
 ------------------------
 
 instance FromObject (SumValueL '[]) where
-  parseObject o = fail "Tag not found"
+  parseObject o = do
+    tag <- o .: "tag"
+    fail $ "SumValueL: Unknown tag: " ++ (T.unpack tag)
 
 instance
   ( KnownSymbol t
@@ -215,6 +201,52 @@ instance
       else do
       that <- parseObject o
       pure $ ThatValue that
+
+instance {-# OVERLAPPABLE #-}
+  ( Eq (StructureValue s)
+  , Eq (SumValueL rest)
+  ) => Eq (SumValueL ( '(t, s) ': rest )) where
+  a' == b' = case (a', b') of
+    (ThisValue _ a, ThisValue _ b) -> a == b
+    (ThatValue a, ThatValue b)     -> a == b
+    _                              -> False
+
+instance {-# OVERLAPPING #-}
+  ( Eq (StructureValue s)
+  ) => Eq (SumValueL ( '(t, s) ': '[] )) where
+  a' == b' = case (a', b') of
+    (ThisValue _ a, ThisValue _ b) -> a == b
+    _                              -> error "Eq: Impossible happened"
+
+instance Show (SumValueL l) where
+  show = \case
+    ThisValue p s -> "(ThisValue " ++ showProxy p ++ " " ++ show s ++ ")"
+    ThatValue r -> "(ThatValue " ++ show r ++ ")"
+
+instance {-# OVERLAPPABLE #-}
+  ( Arbitrary (StructureValue s)
+  , Arbitrary (SumValueL rest)
+  , KnownSymbol t
+  ) => Arbitrary (SumValueL ( '(t, s) ': rest )) where
+  arbitrary = oneof [ this, that ]
+    where
+      this = do
+        s <- arbitrary
+        return $ ThisValue (Proxy @t) s
+      that = do
+        rest <- arbitrary
+        return $ ThatValue rest
+
+instance {-# OVERLAPPING #-}
+  ( Arbitrary (StructureValue s)
+  , KnownSymbol t
+  ) => Arbitrary (SumValueL ( '(t, s) ': '[] )) where
+  arbitrary = do
+    s <- arbitrary
+    return $ ThisValue (Proxy @t) s
+
+instance (FromObject (SumValueL l)) => FromJSON (SumValueL l) where
+  parseJSON = withObject "SumValueL" parseObject
 
 ------------------------------
 -- ProductValueL instances  --
@@ -233,3 +265,36 @@ instance
     v <- o .: (T.pack $ symbolVal p)
     rest <- parseObject o
     pure $ ProductCons p v rest
+
+instance
+  ( Eq (StructureValue s)
+  , Eq (ProductValueL rest)
+  ) => Eq (ProductValueL ( '(t, s) ': rest )) where
+  (ProductCons _ a arest) == (ProductCons _ b brest) = a == b && arest == brest
+
+instance Eq (ProductValueL '[]) where
+  ProductNil == ProductNil = True
+
+instance Show (ProductValueL l) where
+  show = \case
+    ProductNil -> "ProductNil"
+    ProductCons p s rest -> "(ProductCons " ++ showProxy p
+      ++ " " ++ show s
+      ++ " " ++ show rest
+      ++ ")"
+
+instance
+  ( Arbitrary (StructureValue s)
+  , Arbitrary (ProductValueL rest)
+  , KnownSymbol t
+  ) => Arbitrary (ProductValueL ( '(t, s) ': rest )) where
+  arbitrary = do
+    s <- arbitrary
+    rest <- arbitrary
+    return $ ProductCons (Proxy @t) s rest
+
+instance Arbitrary (ProductValueL '[]) where
+  arbitrary = pure ProductNil
+
+instance (FromObject (ProductValueL l)) => FromJSON (ProductValueL l) where
+  parseJSON = withObject "ProductValueL" parseObject
