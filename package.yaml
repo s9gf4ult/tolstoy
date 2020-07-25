@@ -14,6 +14,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
   - base >= 4.7 && < 5
+  - QuickCheck
   - aeson
   - bytestring
   - containers
@@ -21,6 +22,7 @@ dependencies:
   - lens
   - postgresql-query
   - postgresql-simple
+  - quickcheck-instances
   - resource-pool
   - scientific
   - text
@@ -78,7 +80,6 @@ tests:
       - -with-rtsopts=-N
 
     dependencies:
-      - QuickCheck
       - generic-arbitrary
       - monad-logger
       - tasty

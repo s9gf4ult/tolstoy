@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a0592d5412d40d13023f53c61c2bdb11d81e991217be7d3532ce15f2723863dd
+-- hash: 093542516800e5f3622a9bd2bafb800badb7a6a9b926c7354b36b1076517c9fe
 
 name:           tolstoy
 version:        0.0.1
@@ -40,7 +40,8 @@ library
   default-extensions: ConstraintKinds DataKinds DeriveFoldable DeriveFunctor DeriveGeneric DeriveTraversable DuplicateRecordFields FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NumDecimals OverloadedStrings PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeFamilies TypeOperators UndecidableInstances ViewPatterns
   ghc-options: -Wall
   build-depends:
-      aeson
+      QuickCheck
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
@@ -48,6 +49,7 @@ library
     , lens
     , postgresql-query
     , postgresql-simple
+    , quickcheck-instances
     , resource-pool
     , scientific
     , text
@@ -82,6 +84,7 @@ test-suite tolstoy-test
     , monad-logger
     , postgresql-query
     , postgresql-simple
+    , quickcheck-instances
     , resource-pool
     , scientific
     , tasty

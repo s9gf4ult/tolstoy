@@ -60,9 +60,6 @@ arbText = Gen.elements $ do
 arbScientific :: Gen Scientific
 arbScientific = realToFrac <$> (arbitrary :: Gen Double)
 
--- arbScientific :: Gen Scientific
--- arbScientific = Gen.elements [ 0, 2, 42, 2274747 ]
-
 instance Arbitrary SomeStructureValue where
   arbitrary = oneof allCases
     where
