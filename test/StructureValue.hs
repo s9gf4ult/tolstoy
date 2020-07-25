@@ -1,33 +1,17 @@
 module StructureValue where
 
-import Control.Lens
 import Control.Monad
-import Control.Monad.Fail
-import Control.Monad.IO.Class
-import Control.Monad.Logger
 import Data.Aeson as J
-import Data.Generics.Product
-import Data.List.NonEmpty as NE
-import Data.Pool as Pool
-import Data.Proxy
 import Data.Scientific
-import Data.Set as S
 import Data.String
 import Data.Text as T
-import Data.Traversable
 import Data.Vector as V
-import Database.PostgreSQL.Query as PG
-import Database.PostgreSQL.Simple as PG
-import GHC.Generics (Generic)
 import Prelude as P
 import Test.QuickCheck.Arbitrary
-import Test.QuickCheck.Arbitrary.Generic
 import Test.QuickCheck.Gen as Gen
 import Test.QuickCheck.Instances ()
 import Test.Tasty as Test
-import Test.Tasty.HUnit as Test
 import Test.Tasty.QuickCheck
-import Tolstoy.DB
 import Tolstoy.Structure
 
 data SomeStructureValue where
@@ -71,7 +55,7 @@ instance Arbitrary SomeStructureValue where
         , SomeStructureValue . BoolValue <$> arbitrary
         , opt
         , vec
-        , sum
+        , sumSt
         , prod
         ]
       opt = do
@@ -80,13 +64,13 @@ instance Arbitrary SomeStructureValue where
         return $ SomeStructureValue $ OptionalValue sub
       vec = do
         SomeStructureValue (_ :: StructureValue s) <- arbitrary
-        vec <- arbitrary :: Gen (Vector (StructureValue s))
-        return $ SomeStructureValue $ VectorValue vec
-      sum = do
+        v <- arbitrary :: Gen (Vector (StructureValue s))
+        return $ SomeStructureValue $ VectorValue v
+      sumSt = do
         SomeStructureValue (_ :: StructureValue s1) <- arbitrary
         SomeStructureValue (_ :: StructureValue s2) <- arbitrary
-        sum <- arbitrary :: Gen (SumValueL '[ '("some", s1), '("other", s2) ])
-        return $ SomeStructureValue $ SumValue sum
+        s <- arbitrary :: Gen (SumValueL '[ '("some", s1), '("other", s2) ])
+        return $ SomeStructureValue $ SumValue s
       prod = do
         SomeStructureValue (_ :: StructureValue s1) <- arbitrary
         SomeStructureValue (_ :: StructureValue s2) <- arbitrary
