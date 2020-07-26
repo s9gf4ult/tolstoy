@@ -4,6 +4,7 @@ import Data.Proxy
 import Data.Scientific
 import Data.Text (Text)
 import Data.Vector (Vector)
+import GHC.Generics
 import Tolstoy.Structure.Kind
 import Tolstoy.Structure.Value
 
@@ -63,3 +64,16 @@ instance
     ThisValue _ a             -> Left $ fromStructValue a
     ThatValue (ThisValue _ b) -> Right $ fromStructValue b
     ThatValue (ThatValue _)   -> error "Impossible happened"
+
+class GStructural (f :: * -> *) where
+  type GStructKind f :: Structure
+  gToStructValue :: f p -> StructureValue (GStructKind f)
+  gFromStructValue :: StructureValue (GStructKind f) -> f p
+
+-- | Top level instance for non-newtypes only
+instance
+  ( GStructural sub
+  ) => GStructural (D1 (MetaData n m p 'False) sub) where
+  type GStructKind (D1 (MetaData n m p 'False) sub) = GStructKind sub
+  gToStructValue (M1 fp) = gToStructValue fp
+  gFromStructValue v = M1 $ gFromStructValue v
