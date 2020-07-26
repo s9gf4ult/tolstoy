@@ -34,6 +34,7 @@ dependencies:
 default-extensions:
   - ConstraintKinds
   - DataKinds
+  - DefaultSignatures
   - DeriveFoldable
   - DeriveFunctor
   - DeriveGeneric

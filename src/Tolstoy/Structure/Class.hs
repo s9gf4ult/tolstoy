@@ -10,7 +10,13 @@ import Tolstoy.Structure.Value
 
 class Structural s where
   type StructKind s :: Structure
+  -- type StructKind s = GStructKind (Rep s)
   toStructValue :: s -> StructureValue (StructKind s)
+  -- default toStructValue
+  --   :: (Generic s, GStructural (Rep s))
+  --   => s
+  --   -> StructureValue (StructKind s)
+  -- toStructValue s = gToStructValue (from s)
   fromStructValue :: StructureValue (StructKind s) -> s
 
 instance Structural Text where
