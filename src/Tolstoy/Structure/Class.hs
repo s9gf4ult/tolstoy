@@ -5,6 +5,7 @@ import Data.Scientific
 import Data.Text (Text)
 import Data.Vector (Vector)
 import GHC.Generics
+import GHC.TypeLits
 import Tolstoy.Structure.Kind
 import Tolstoy.Structure.Value
 
@@ -90,26 +91,41 @@ instance (GProduct sels) => GStructural (C1 ('MetaCons cn f 'True) sels) where
   type GStructKind (C1 ('MetaCons cn f 'True) sels) =
     StructProduct (GProdKind sels)
   gToStructValue (M1 fp) = ProductValue (gToProductValue fp)
-  gFromStructValue (ProductValue pl) = gFromProductValue pl
+  gFromStructValue (ProductValue pl) = M1 $ gFromProductValue pl
 
 instance
   ( GSum (C1 ('MetaCons cn f 'False) sels)
   ) => GStructural (C1 ('MetaCons cn f 'False) sels) where
   type GStructKind (C1 ('MetaCons cn f 'False) sels) =
     StructSum (GSumKind (C1 ('MetaCons cn f 'False) sels))
-  gToStructValue (M1 fp) = SumValueL (gToSumValue fp)
-  gFromStructValue (SumValueL pl) = gFromSumValue pl
+  gToStructValue m1 = SumValue (gToSumValue m1)
+  gFromStructValue (SumValue pl) = gFromSumValue pl
 
 instance (GSum (l :+: r)) => GStructural (l :+: r) where
   type GStructKind (l :+: r) =
     StructSum (GSumKind (l :+: r))
-  gToStructValue (M1 fp) = SumValueL (gToSumValue fp)
-  gFromStructValue (SumValueL pl) = gFromSumValue pl
+  gToStructValue m1 = SumValue (gToSumValue m1)
+  gFromStructValue (SumValue pl) = gFromSumValue pl
 
 class GProduct (f :: * -> *) where
   type GProdKind f :: [(Symbol, Structure)]
   gToProductValue :: f p -> ProductValueL (GProdKind f)
   gFromProductValue :: ProductValueL (GProdKind f) -> f p
+
+instance
+  ( Structural typ
+  , KnownSymbol n
+  ) => GProduct (S1 ('MetaSel ('Just n) a b c) (Rec0 typ)) where
+  type GProdKind (S1 ('MetaSel ('Just n) a b c) (Rec0 typ)) =
+    '[ '(n, StructKind typ) ]
+  gToProductValue (M1 (K1 typ)) =
+    ProductCons (Proxy @n) (toStructValue typ) ProductNil
+
+instance
+  ( GProduct l
+  , GProduct r
+  ) => GProduct (l :*: r) where
+  type GProdKind (l :*: r)
 
 class GSum (f :: * -> *) where
   type GSumKind f :: [(Symbol, Structure)]
