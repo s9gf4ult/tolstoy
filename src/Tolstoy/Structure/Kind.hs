@@ -9,7 +9,16 @@ data Structure
   | StructBool
   | StructOptional Structure
   | StructVector Structure
-  | StructSum [(Symbol, Structure)]
-  | StructProduct [(Symbol, Structure)]
+  | StructSum SumTree
+  | StructProduct ProductTree
 
-type StructEmpty = 'StructProduct '[]
+data SumTree
+  = Sum1 Symbol Structure
+  | Sum2 SumTree SumTree
+
+data ProductTree
+  = Product0
+  | Product1 Symbol Structure
+  | Product2 ProductTree ProductTree
+
+type StructureEmpty = StructProduct Product0

@@ -11,14 +11,19 @@ import Tolstoy.Structure.Value
 
 class Structural s where
   type StructKind s :: Structure
-  -- type StructKind s = GStructKind (Rep s)
+  type StructKind s = GStructKind (Rep s)
   toStructValue :: s -> StructureValue (StructKind s)
-  -- default toStructValue
-  --   :: (Generic s, GStructural (Rep s))
-  --   => s
-  --   -> StructureValue (StructKind s)
-  -- toStructValue s = gToStructValue (from s)
+  default toStructValue
+    :: (Generic s, GStructural (Rep s), StructKind s ~ GStructKind (Rep s))
+    => s
+    -> StructureValue (StructKind s)
+  toStructValue s = gToStructValue (from s)
   fromStructValue :: StructureValue (StructKind s) -> s
+  default fromStructValue
+    :: (Generic s, GStructural (Rep s), StructKind s ~ GStructKind (Rep s))
+    => StructureValue (StructKind s)
+    -> s
+  fromStructValue s = to (gFromStructValue s)
 
 instance Structural Text where
   type StructKind Text = 'StructString
@@ -45,32 +50,35 @@ instance (Structural s) => Structural (Vector s) where
   toStructValue v = VectorValue $ toStructValue <$> v
   fromStructValue (VectorValue v) = fromStructValue <$> v
 
-instance
-  ( Structural a
-  , Structural b
-  ) => Structural (a, b) where
-  type StructKind (a, b) = 'StructProduct
-    '[ '("0", StructKind a), '("1", StructKind b) ]
-  toStructValue (a, b) = ProductValue
-    $ ProductCons Proxy (toStructValue a)
-    $ ProductCons Proxy (toStructValue b)
-    ProductNil
-  fromStructValue (ProductValue (ProductCons _ a (ProductCons _ b ProductNil)))
-    = (fromStructValue a, fromStructValue b)
+-- | Generic instance deriving
+instance (Structural a, Structural b) => Structural (Either a b)
 
-instance
-  ( Structural a
-  , Structural b
-  ) => Structural (Either a b) where
-  type StructKind (Either a b) = 'StructSum
-    '[ '("left", StructKind a), '("right", StructKind b) ]
-  toStructValue = \case
-    Left a -> SumValue $ ThisValue Proxy $ toStructValue a
-    Right b -> SumValue $ ThatValue $ ThisValue Proxy $ toStructValue b
-  fromStructValue (SumValue s) = case s of
-    ThisValue _ a             -> Left $ fromStructValue a
-    ThatValue (ThisValue _ b) -> Right $ fromStructValue b
-    ThatValue (ThatValue _)   -> error "Impossible happened"
+-- instance
+--   ( Structural a
+--   , Structural b
+--   ) => Structural (a, b) where
+--   type StructKind (a, b) = 'StructProduct
+--     '[ '("0", StructKind a), '("1", StructKind b) ]
+--   toStructValue (a, b) = ProductValue
+--     $ ProductCons Proxy (toStructValue a)
+--     $ ProductCons Proxy (toStructValue b)
+--     ProductNil
+--   fromStructValue (ProductValue (ProductCons _ a (ProductCons _ b ProductNil)))
+--     = (fromStructValue a, fromStructValue b)
+
+-- instance
+--   ( Structural a
+--   , Structural b
+--   ) => Structural (Either a b) where
+--   type StructKind (Either a b) = 'StructSum
+--     '[ '("left", StructKind a), '("right", StructKind b) ]
+--   toStructValue = \case
+--     Left a -> SumValue $ ThisValue Proxy $ toStructValue a
+--     Right b -> SumValue $ ThatValue $ ThisValue Proxy $ toStructValue b
+--   fromStructValue (SumValue s) = case s of
+--     ThisValue _ a             -> Left $ fromStructValue a
+--     ThatValue (ThisValue _ b) -> Right $ fromStructValue b
+--     ThatValue (ThatValue _)   -> error "Impossible happened"
 
 class GStructural (f :: * -> *) where
   type GStructKind f :: Structure
@@ -85,7 +93,7 @@ instance
   gToStructValue (M1 fp) = gToStructValue fp
   gFromStructValue v = M1 $ gFromStructValue v
 
--- If constructor uses record syntax, then it is encoded as a tagged
+-- | If constructor uses record syntax, then it is encoded as a tagged
 -- product (json object)
 instance (GProduct sels) => GStructural (C1 ('MetaCons cn f 'True) sels) where
   type GStructKind (C1 ('MetaCons cn f 'True) sels) =
@@ -93,6 +101,7 @@ instance (GProduct sels) => GStructural (C1 ('MetaCons cn f 'True) sels) where
   gToStructValue (M1 fp) = ProductValue (gToProductValue fp)
   gFromStructValue (ProductValue pl) = M1 $ gFromProductValue pl
 
+-- | Constructor not using the record syntax is a sum
 instance
   ( GSum (C1 ('MetaCons cn f 'False) sels)
   ) => GStructural (C1 ('MetaCons cn f 'False) sels) where
@@ -107,27 +116,85 @@ instance (GSum (l :+: r)) => GStructural (l :+: r) where
   gToStructValue m1 = SumValue (gToSumValue m1)
   gFromStructValue (SumValue pl) = gFromSumValue pl
 
+-- | Encode generic rep as ProductTreeValue
 class GProduct (f :: * -> *) where
-  type GProdKind f :: [(Symbol, Structure)]
-  gToProductValue :: f p -> ProductValueL (GProdKind f)
-  gFromProductValue :: ProductValueL (GProdKind f) -> f p
+  type GProdKind f :: ProductTree
+  gToProductValue :: f p -> ProductTreeValue (GProdKind f)
+  gFromProductValue :: ProductTreeValue (GProdKind f) -> f p
 
+-- | Constructor with no arguments but with record syntax is an empty
+-- product
+instance GProduct U1 where
+  type GProdKind U1 = 'Product0
+  gToProductValue U1 = ProductValue0
+  gFromProductValue ProductValue0 = U1
+
+-- | Single selector with name is a product of one element
 instance
   ( Structural typ
   , KnownSymbol n
   ) => GProduct (S1 ('MetaSel ('Just n) a b c) (Rec0 typ)) where
   type GProdKind (S1 ('MetaSel ('Just n) a b c) (Rec0 typ)) =
-    '[ '(n, StructKind typ) ]
+    'Product1 n (StructKind typ)
   gToProductValue (M1 (K1 typ)) =
-    ProductCons (Proxy @n) (toStructValue typ) ProductNil
+    ProductValue1 (Proxy @n) (toStructValue typ)
+  gFromProductValue (ProductValue1 _ s) = M1 $ K1 $ fromStructValue s
 
+-- | Product is obviously a product
 instance
   ( GProduct l
   , GProduct r
   ) => GProduct (l :*: r) where
-  type GProdKind (l :*: r)
+  type GProdKind (l :*: r) =
+    'Product2 (GProdKind l) (GProdKind r)
+  gToProductValue (l :*: r) = ProductValue2
+    (gToProductValue l) (gToProductValue r)
+  gFromProductValue (ProductValue2 l r) =
+    (gFromProductValue l) :*: (gFromProductValue r)
 
 class GSum (f :: * -> *) where
-  type GSumKind f :: [(Symbol, Structure)]
-  gToSumValue :: f p -> SumValueL (GSumKind f)
-  gFromSumValue :: SumValueL (GSumKind f) -> f p
+  type GSumKind f :: SumTree
+  gToSumValue :: f p -> SumTreeValue (GSumKind f)
+  gFromSumValue :: SumTreeValue (GSumKind f) -> f p
+
+-- | Constructor with no arguments is just a single element enum
+-- (tagged sum with no data assigned)
+instance
+  ( KnownSymbol cn
+  ) => GSum (C1 ('MetaCons cn f 'False) U1) where
+  type GSumKind (C1 ('MetaCons cn f 'False) U1) = 'Sum1 cn StructureEmpty
+  gToSumValue (M1 _) = Sum1Value (Proxy @cn) emptyValue
+  gFromSumValue (Sum1Value _ _) = M1 U1
+
+-- | Constructor with single argument is a single element tagged sum
+instance
+  ( KnownSymbol cn
+  , Structural typ
+  ) => GSum (C1 ('MetaCons cn f 'False) (S1 st (Rec0 typ))) where
+  type GSumKind (C1 ('MetaCons cn f 'False) (S1 st (Rec0 typ))) =
+    'Sum1 cn (StructKind typ)
+  gToSumValue (M1 (M1 (K1 typ))) = Sum1Value (Proxy @cn) (toStructValue typ)
+  gFromSumValue (Sum1Value _ s) = M1 $ M1 $ K1 $ fromStructValue s
+
+-- | Sum is obviously a sum
+instance
+  ( GSum l
+  , GSum r
+  ) => GSum (l :+: r) where
+  type GSumKind (l :+: r) = 'Sum2 (GSumKind l) (GSumKind r)
+  gToSumValue = \case
+    L1 l -> Sum2Left $ gToSumValue l
+    R1 r -> Sum2Right $ gToSumValue r
+  gFromSumValue = \case
+    Sum2Left l -> L1 $ gFromSumValue l
+    Sum2Right r -> R1 $ gFromSumValue r
+
+instance
+  ( KnownSymbol cn
+  , GProduct sels
+  ) => GSum (C1 ('MetaCons cn f 'True) sels) where
+  type GSumKind (C1 ('MetaCons cn f 'True) sels) =
+    'Sum1 cn ('StructProduct (GProdKind sels))
+  gToSumValue (M1 sels) = Sum1Value (Proxy @cn)
+    (ProductValue $ gToProductValue sels)
+  gFromSumValue (Sum1Value _ (ProductValue sels)) = M1 $ gFromProductValue sels
