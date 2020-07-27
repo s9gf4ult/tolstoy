@@ -83,3 +83,35 @@ instance
   type GStructKind (D1 (MetaData n m p 'False) sub) = GStructKind sub
   gToStructValue (M1 fp) = gToStructValue fp
   gFromStructValue v = M1 $ gFromStructValue v
+
+-- If constructor uses record syntax, then it is encoded as a tagged
+-- product (json object)
+instance (GProduct sels) => GStructural (C1 ('MetaCons cn f 'True) sels) where
+  type GStructKind (C1 ('MetaCons cn f 'True) sels) =
+    StructProduct (GProdKind sels)
+  gToStructValue (M1 fp) = ProductValue (gToProductValue fp)
+  gFromStructValue (ProductValue pl) = gFromProductValue pl
+
+instance
+  ( GSum (C1 ('MetaCons cn f 'False) sels)
+  ) => GStructural (C1 ('MetaCons cn f 'False) sels) where
+  type GStructKind (C1 ('MetaCons cn f 'False) sels) =
+    StructSum (GSumKind (C1 ('MetaCons cn f 'False) sels))
+  gToStructValue (M1 fp) = SumValueL (gToSumValue fp)
+  gFromStructValue (SumValueL pl) = gFromSumValue pl
+
+instance (GSum (l :+: r)) => GStructural (l :+: r) where
+  type GStructKind (l :+: r) =
+    StructSum (GSumKind (l :+: r))
+  gToStructValue (M1 fp) = SumValueL (gToSumValue fp)
+  gFromStructValue (SumValueL pl) = gFromSumValue pl
+
+class GProduct (f :: * -> *) where
+  type GProdKind f :: [(Symbol, Structure)]
+  gToProductValue :: f p -> ProductValueL (GProdKind f)
+  gFromProductValue :: ProductValueL (GProdKind f) -> f p
+
+class GSum (f :: * -> *) where
+  type GSumKind f :: [(Symbol, Structure)]
+  gToSumValue :: f p -> SumValueL (GSumKind f)
+  gFromSumValue :: SumValueL (GSumKind f) -> f p
