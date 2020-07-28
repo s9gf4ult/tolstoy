@@ -51,25 +51,7 @@ data User = User
   , status :: UserStatus
   } deriving (Eq, Ord, Show, Generic)
 
-instance Structural User where
-  type StructKind User = 'StructProduct
-    '[ '("name", StructKind (Maybe Name))
-     , '("email", StructKind Email)
-     , '("status", StructKind UserStatus)
-     ]
-  toStructValue (User name email status) = ProductValue
-    $ ProductCons Proxy (toStructValue name)
-    $ ProductCons Proxy (toStructValue email)
-    $ ProductCons Proxy (toStructValue status)
-    ProductNil
-  fromStructValue
-    (ProductValue
-     (ProductCons _ name
-      (ProductCons _ email
-       (ProductCons _ status ProductNil)))) = User
-    (fromStructValue name)
-    (fromStructValue email)
-    (fromStructValue status)
+instance Structural User
 
 instance Arbitrary User where
   arbitrary = genericArbitrary
@@ -80,26 +62,12 @@ data UserStatus
   | Confirmed
   | Banned
   deriving (Eq, Ord, Show, Generic)
+
 instance Arbitrary UserStatus where
   arbitrary = genericArbitrary
   shrink = genericShrink
 
-instance Structural UserStatus where
-  type StructKind UserStatus = 'StructSum
-    '[ '("registered", StructEmpty)
-     , '("confirmed", StructEmpty)
-     , '("banned", StructEmpty) ]
-  toStructValue = \case
-    Registered -> SumValue $ ThisValue (Proxy @"registered") structEmpty
-    Confirmed -> SumValue $ ThatValue
-      $ ThisValue (Proxy @"confirmed") structEmpty
-    Banned -> SumValue $ ThatValue $ ThatValue
-      $ ThisValue (Proxy @"banned") structEmpty
-  fromStructValue (SumValue s) = case s of
-    ThisValue _ _                         -> Registered
-    ThatValue (ThisValue _ _)             -> Confirmed
-    ThatValue (ThatValue (ThisValue _ _)) -> Banned
-    ThatValue (ThatValue (ThatValue _))   -> error "Impossible happened"
+instance Structural UserStatus
 
 initUser :: User
 initUser = User
@@ -119,30 +87,7 @@ instance Arbitrary UserAction where
   arbitrary = genericArbitrary
   shrink = genericShrink
 
-instance Structural UserAction where
-  type StructKind UserAction = 'StructSum
-    '[ '("init", ('StructProduct '[]))
-     , '("set_name", 'StructString)
-     , '("set_email", 'StructString)
-     , '("confirm", ('StructProduct '[]))
-     , '("ban", ('StructProduct '[]))
-     ]
-  toStructValue a = SumValue $ case a of
-    Init -> ThisValue Proxy (ProductValue ProductNil)
-    SetName n -> ThatValue $ ThisValue Proxy (toStructValue n)
-    SetEmail e -> ThatValue $ ThatValue $ ThisValue Proxy (toStructValue e)
-    Confirm -> ThatValue $ ThatValue $ ThatValue $ ThisValue Proxy
-      $ ProductValue ProductNil
-    Ban -> ThatValue $ ThatValue $ ThatValue $ ThatValue
-      $ ThisValue Proxy $ ProductValue ProductNil
-  fromStructValue (SumValue s) = case s of
-    ThisValue _ _ -> Init
-    ThatValue (ThisValue _ n) -> SetName (fromStructValue n)
-    ThatValue (ThatValue (ThisValue _ e)) -> SetEmail (fromStructValue e)
-    ThatValue (ThatValue (ThatValue (ThisValue _ _))) -> Confirm
-    ThatValue (ThatValue (ThatValue (ThatValue (ThisValue _ _)))) -> Ban
-    ThatValue (ThatValue (ThatValue (ThatValue (ThatValue _)))) ->
-      error "Impossible happened"
+instance Structural UserAction
 
 userAction :: PureDocAction User UserAction
 userAction = pureDocAction $ \user -> \case
