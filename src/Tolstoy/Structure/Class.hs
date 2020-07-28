@@ -88,8 +88,8 @@ class GStructural (f :: * -> *) where
 -- | Top level instance for non-newtypes only
 instance
   ( GStructural sub
-  ) => GStructural (D1 (MetaData n m p 'False) sub) where
-  type GStructKind (D1 (MetaData n m p 'False) sub) = GStructKind sub
+  ) => GStructural (D1 ('MetaData n m p 'False) sub) where
+  type GStructKind (D1 ('MetaData n m p 'False) sub) = GStructKind sub
   gToStructValue (M1 fp) = gToStructValue fp
   gFromStructValue v = M1 $ gFromStructValue v
 
@@ -97,7 +97,7 @@ instance
 -- product (json object)
 instance (GProduct sels) => GStructural (C1 ('MetaCons cn f 'True) sels) where
   type GStructKind (C1 ('MetaCons cn f 'True) sels) =
-    StructProduct (GProdKind sels)
+    'StructProduct (GProdKind sels)
   gToStructValue (M1 fp) = ProductValue (gToProductValue fp)
   gFromStructValue (ProductValue pl) = M1 $ gFromProductValue pl
 
@@ -106,13 +106,13 @@ instance
   ( GSum (C1 ('MetaCons cn f 'False) sels)
   ) => GStructural (C1 ('MetaCons cn f 'False) sels) where
   type GStructKind (C1 ('MetaCons cn f 'False) sels) =
-    StructSum (GSumKind (C1 ('MetaCons cn f 'False) sels))
+    'StructSum (GSumKind (C1 ('MetaCons cn f 'False) sels))
   gToStructValue m1 = SumValue (gToSumValue m1)
   gFromStructValue (SumValue pl) = gFromSumValue pl
 
 instance (GSum (l :+: r)) => GStructural (l :+: r) where
   type GStructKind (l :+: r) =
-    StructSum (GSumKind (l :+: r))
+    'StructSum (GSumKind (l :+: r))
   gToStructValue m1 = SumValue (gToSumValue m1)
   gFromStructValue (SumValue pl) = gFromSumValue pl
 
@@ -126,8 +126,8 @@ class GProduct (f :: * -> *) where
 -- product
 instance GProduct U1 where
   type GProdKind U1 = 'Product0
-  gToProductValue U1 = ProductValue0
-  gFromProductValue ProductValue0 = U1
+  gToProductValue U1 = Product0Value
+  gFromProductValue Product0Value = U1
 
 -- | Single selector with name is a product of one element
 instance
@@ -137,8 +137,8 @@ instance
   type GProdKind (S1 ('MetaSel ('Just n) a b c) (Rec0 typ)) =
     'Product1 n (StructKind typ)
   gToProductValue (M1 (K1 typ)) =
-    ProductValue1 (Proxy @n) (toStructValue typ)
-  gFromProductValue (ProductValue1 _ s) = M1 $ K1 $ fromStructValue s
+    Product1Value (Proxy @n) (toStructValue typ)
+  gFromProductValue (Product1Value _ s) = M1 $ K1 $ fromStructValue s
 
 -- | Product is obviously a product
 instance
@@ -147,9 +147,9 @@ instance
   ) => GProduct (l :*: r) where
   type GProdKind (l :*: r) =
     'Product2 (GProdKind l) (GProdKind r)
-  gToProductValue (l :*: r) = ProductValue2
+  gToProductValue (l :*: r) = Product2Value
     (gToProductValue l) (gToProductValue r)
-  gFromProductValue (ProductValue2 l r) =
+  gFromProductValue (Product2Value l r) =
     (gFromProductValue l) :*: (gFromProductValue r)
 
 class GSum (f :: * -> *) where
