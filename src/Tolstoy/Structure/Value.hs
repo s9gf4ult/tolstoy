@@ -164,10 +164,10 @@ instance
   ) => Eq (StructureValue ('StructSum l)) where
   (SumValue a) == (SumValue b) = a == b
 
--- instance
---   ( Arbitrary (SumValueL l)
---   ) => Arbitrary (StructureValue ('StructSum l)) where
---   arbitrary = SumValue <$> arbitrary
+instance
+  ( Arbitrary (SumTreeValue l)
+  ) => Arbitrary (StructureValue ('StructSum l)) where
+  arbitrary = SumValue <$> arbitrary
 
 instance (FromObject (SumTreeValue t))
   => FromJSON (StructureValue (StructSum t)) where
@@ -178,10 +178,10 @@ instance
   ) => Eq (StructureValue ('StructProduct l)) where
   (ProductValue a) == (ProductValue b) = a == b
 
--- instance
---   ( Arbitrary (ProductValueL l)
---   ) => Arbitrary (StructureValue ('StructProduct l)) where
---   arbitrary = ProductValue <$> arbitrary
+instance
+  ( Arbitrary (ProductTreeValue l)
+  ) => Arbitrary (StructureValue ('StructProduct l)) where
+  arbitrary = ProductValue <$> arbitrary
 
 instance (FromObject (ProductTreeValue t))
   => FromJSON (StructureValue (StructProduct t)) where
@@ -236,27 +236,19 @@ instance Show (SumTreeValue t) where
     Sum2Left l    -> "(Sum2Left " ++ show l ++ ")"
     Sum2Right r   -> "(Sum2Right " ++ show r ++ ")"
 
--- instance {-# OVERLAPPABLE #-}
---   ( Arbitrary (StructureValue s)
---   , Arbitrary (SumValueL rest)
---   , KnownSymbol t
---   ) => Arbitrary (SumValueL ( '(t, s) ': rest )) where
---   arbitrary = oneof [ this, that ]
---     where
---       this = do
---         s <- arbitrary
---         return $ ThisValue (Proxy @t) s
---       that = do
---         rest <- arbitrary
---         return $ ThatValue rest
+instance
+  ( Arbitrary (StructureValue s)
+  , KnownSymbol n
+  ) => Arbitrary (SumTreeValue ('Sum1 n s)) where
+  arbitrary = Sum1Value Proxy <$> arbitrary
 
--- instance {-# OVERLAPPING #-}
---   ( Arbitrary (StructureValue s)
---   , KnownSymbol t
---   ) => Arbitrary (SumValueL ( '(t, s) ': '[] )) where
---   arbitrary = do
---     s <- arbitrary
---     return $ ThisValue (Proxy @t) s
+instance
+  ( Arbitrary (SumTreeValue t1)
+  , Arbitrary (SumTreeValue t2)
+  ) => Arbitrary (SumTreeValue ('Sum2 t1 t2)) where
+  arbitrary = oneof
+    [ Sum2Left <$> arbitrary
+    , Sum2Right <$> arbitrary ]
 
 instance (FromObject (SumTreeValue l)) => FromJSON (SumTreeValue l) where
   parseJSON = withObject "SumTreeValue" parseObject
@@ -307,22 +299,23 @@ instance Show (ProductTreeValue l) where
     Product1Value p s -> "(Product1Value "  ++ showProxy p
       ++ " " ++ show s ++ ")"
     Product2Value t1 t2 -> "(Product2Value "
-      ++ show t2 ++ " "
+      ++ show t1 ++ " "
       ++ show t2 ++ ")"
 
+instance Arbitrary (ProductTreeValue 'Product0) where
+  arbitrary = pure Product0Value
 
--- instance
---   ( Arbitrary (StructureValue s)
---   , Arbitrary (ProductValueL rest)
---   , KnownSymbol t
---   ) => Arbitrary (ProductValueL ( '(t, s) ': rest )) where
---   arbitrary = do
---     s <- arbitrary
---     rest <- arbitrary
---     return $ ProductCons (Proxy @t) s rest
+instance
+  ( Arbitrary (StructureValue s)
+  , KnownSymbol n
+  ) => Arbitrary (ProductTreeValue ('Product1 n s)) where
+  arbitrary = Product1Value Proxy <$> arbitrary
 
--- instance Arbitrary (ProductValueL '[]) where
---   arbitrary = pure ProductNil
+instance
+  ( Arbitrary (ProductTreeValue t1)
+  , Arbitrary (ProductTreeValue t2)
+  ) => Arbitrary (ProductTreeValue ('Product2 t1 t2)) where
+  arbitrary = Product2Value <$> arbitrary <*> arbitrary
 
 instance (FromObject (ProductTreeValue l)) => FromJSON (ProductTreeValue l) where
   parseJSON = withObject "ProductTreeValue" parseObject
