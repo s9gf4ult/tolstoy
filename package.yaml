@@ -82,6 +82,7 @@ tests:
 
     dependencies:
       - generic-arbitrary
+      - hspec-expectations
       - monad-logger
       - tasty
       - tasty-discover
@@ -89,5 +90,6 @@ tests:
       - tasty-quickcheck
       - tolstoy
       - transformers
+
     build-tools:
       - autoexporter

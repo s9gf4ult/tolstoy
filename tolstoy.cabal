@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5949a3768f4d55d63b4fcc0dcc5c57f96bb9c1daa4ca70e62bce688d15a08aef
+-- hash: ada979483f7864b19667ed8c61d7c785d9989de0e39b7066c4e4cd3074424b4b
 
 name:           tolstoy
 version:        0.0.1
@@ -64,6 +64,9 @@ test-suite tolstoy-test
   main-is: Spec.hs
   other-modules:
       Example
+      StructureRep
+      StructureRep.Alter
+      StructureRep.Main
       StructureValue
       Paths_tolstoy
   hs-source-dirs:
@@ -80,6 +83,7 @@ test-suite tolstoy-test
     , containers
     , generic-arbitrary
     , generic-lens
+    , hspec-expectations
     , lens
     , monad-logger
     , postgresql-query

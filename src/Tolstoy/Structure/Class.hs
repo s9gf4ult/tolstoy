@@ -1,13 +1,14 @@
 module Tolstoy.Structure.Class where
 
-import Data.Proxy
-import Data.Scientific
-import Data.Text (Text)
-import Data.Vector (Vector)
-import GHC.Generics
-import GHC.TypeLits
-import Tolstoy.Structure.Kind
-import Tolstoy.Structure.Value
+import           Data.Proxy
+import           Data.Scientific
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Vector (Vector)
+import           GHC.Generics
+import           GHC.TypeLits
+import           Tolstoy.Structure.Kind
+import           Tolstoy.Structure.Value
 
 class Structural s where
   type StructKind s :: Structure
@@ -30,10 +31,20 @@ instance Structural Text where
   toStructValue = StringValue
   fromStructValue (StringValue t) = t
 
+instance Structural String where
+  type StructKind String = 'StructString
+  toStructValue = StringValue . T.pack
+  fromStructValue (StringValue t) = T.unpack t
+
 instance Structural Scientific where
   type StructKind Scientific = 'StructNumber
   toStructValue = NumberValue
   fromStructValue (NumberValue s) = s
+
+instance Structural Int where
+  type StructKind Int = 'StructNumber
+  toStructValue = NumberValue . realToFrac
+  fromStructValue (NumberValue v) = fromInteger $ round v
 
 instance Structural Bool where
   type StructKind Bool = 'StructBool
