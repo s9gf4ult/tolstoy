@@ -53,33 +53,6 @@ instance (Structural s) => Structural (Vector s) where
 -- | Generic instance deriving
 instance (Structural a, Structural b) => Structural (Either a b)
 
--- instance
---   ( Structural a
---   , Structural b
---   ) => Structural (a, b) where
---   type StructKind (a, b) = 'StructProduct
---     '[ '("0", StructKind a), '("1", StructKind b) ]
---   toStructValue (a, b) = ProductValue
---     $ ProductCons Proxy (toStructValue a)
---     $ ProductCons Proxy (toStructValue b)
---     ProductNil
---   fromStructValue (ProductValue (ProductCons _ a (ProductCons _ b ProductNil)))
---     = (fromStructValue a, fromStructValue b)
-
--- instance
---   ( Structural a
---   , Structural b
---   ) => Structural (Either a b) where
---   type StructKind (Either a b) = 'StructSum
---     '[ '("left", StructKind a), '("right", StructKind b) ]
---   toStructValue = \case
---     Left a -> SumValue $ ThisValue Proxy $ toStructValue a
---     Right b -> SumValue $ ThatValue $ ThisValue Proxy $ toStructValue b
---   fromStructValue (SumValue s) = case s of
---     ThisValue _ a             -> Left $ fromStructValue a
---     ThatValue (ThisValue _ b) -> Right $ fromStructValue b
---     ThatValue (ThatValue _)   -> error "Impossible happened"
-
 class GStructural (f :: * -> *) where
   type GStructKind f :: Structure
   gToStructValue :: f p -> StructureValue (GStructKind f)
