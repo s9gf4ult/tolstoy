@@ -1,7 +1,11 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 module StructureRep where
 
+import Control.DeepSeq
 import Control.Monad
 import Data.Aeson as J
+import Data.Maybe
 import Data.Scientific
 import Data.String
 import Data.Text as T
@@ -11,6 +15,7 @@ import Prelude as P
 import StructureRep.Alter as Alter
 import StructureRep.Main as Main
 import Test.Hspec.Expectations
+import Test.QuickCheck
 import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Gen as Gen
 import Test.QuickCheck.Instances ()
@@ -19,20 +24,46 @@ import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Tolstoy.Structure
 
+jsonProp
+  :: forall a b.
+  ( Structural a
+  , Structural b
+  , NFData b
+  , FromJSON (StructureValue (StructKind b)))
+  => a
+  -> Property
+jsonProp a =
+  let
+    dec :: Maybe (StructureValue (StructKind b))
+    dec = J.decode $ J.encode $ toStructValue a
+  in case fromStructValue <$> dec of
+    Nothing       -> error "Got Nothing"
+    Just (b :: b) -> total b
+
+avaiTree
+  :: forall a b.
+  ( Structural a
+  , Structural b
+  , NFData b
+  , FromJSON (StructureValue (StructKind b))
+  , KnownStructure (StructKind a)
+  , KnownStructure (StructKind b)
+  , Arbitrary a
+  , Show a )
+  => TestName
+  -> TestTree
+avaiTree n = testGroup n
+  [ testCase "Rep compatible" $ shouldBe
+    (toJSON (structureRep :: StructureRep (StructKind a)))
+    (toJSON (structureRep :: StructureRep (StructKind b)))
+  , testProperty "Value FromJSON/ToJSON" $ jsonProp @a @b ]
+
 test_Available :: TestTree
 test_Available = testGroup "Available structure changings"
-  [ testCase "Split constructors" $ shouldBe
-        (toJSON (structureRep :: StructureRep (StructKind Main.Struct1)))
-        (toJSON (structureRep :: StructureRep (StructKind Alter.Struct1)))
-  , testCase "Change product fields order" $ shouldBe
-        (toJSON (structureRep :: StructureRep (StructKind Main.Struct2)))
-        (toJSON (structureRep :: StructureRep (StructKind Alter.Struct2)))
-  , testCase "Change sum fields order" $ shouldBe
-        (toJSON (structureRep :: StructureRep (StructKind Main.Struct3)))
-        (toJSON (structureRep :: StructureRep (StructKind Alter.Struct3)))
-  , testCase "Complex case" $ shouldBe
-        (toJSON (structureRep :: StructureRep (StructKind Main.Complex)))
-        (toJSON (structureRep :: StructureRep (StructKind Alter.Complex)))
+  [ avaiTree @Main.Struct1 @Alter.Struct1 "Split constructors"
+  , avaiTree @Main.Struct2 @Alter.Struct2 "Change product fields order"
+  , avaiTree @Main.Struct3 @Alter.Struct3  "Change sum fields order"
+  , avaiTree @Main.Complex @Alter.Complex "Complex case"
   ]
 
 test_Broken :: TestTree

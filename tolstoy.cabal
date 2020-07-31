@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ada979483f7864b19667ed8c61d7c785d9989de0e39b7066c4e4cd3074424b4b
+-- hash: 1e6bef560d2ad3313d3ef7a02bc467d2ee0973aff6aa0b779b9fc817aad68e4e
 
 name:           tolstoy
 version:        0.0.1
@@ -81,6 +81,7 @@ test-suite tolstoy-test
     , base >=4.7 && <5
     , bytestring
     , containers
+    , deepseq
     , generic-arbitrary
     , generic-lens
     , hspec-expectations

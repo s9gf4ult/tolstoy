@@ -2,6 +2,8 @@ module StructureRep.Main where
 
 import Data.Text as T
 import GHC.Generics (Generic)
+import Test.QuickCheck.Arbitrary
+import Test.QuickCheck.Arbitrary.Generic
 import Tolstoy.Structure
 
 data Struct1
@@ -13,6 +15,9 @@ data Struct1
   deriving (Eq, Ord, Show, Generic)
 
 instance Structural Struct1
+instance Arbitrary Struct1 where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 data Struct2 = Struct2
   { field2 :: Text
@@ -20,6 +25,9 @@ data Struct2 = Struct2
   } deriving (Eq, Ord, Show, Generic)
 
 instance Structural Struct2
+instance Arbitrary Struct2 where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 data Struct3
   = Two String
@@ -27,6 +35,9 @@ data Struct3
   deriving (Eq, Ord, Show, Generic)
 
 instance Structural Struct3
+instance Arbitrary Struct3 where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 data Complex
   = Complex
@@ -38,6 +49,9 @@ data Complex
   deriving (Eq, Ord, Show, Generic)
 
 instance Structural Complex
+instance Arbitrary Complex where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 data Broken1 = Broken1
   { this :: String

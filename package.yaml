@@ -84,6 +84,7 @@ tests:
       - generic-arbitrary
       - hspec-expectations
       - monad-logger
+      - deepseq
       - tasty
       - tasty-discover
       - tasty-hunit
