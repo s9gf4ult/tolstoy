@@ -14,20 +14,20 @@ data StructureRep :: Structure -> * where
   StringRep   :: StructureRep StructString
   NumberRep   :: StructureRep StructNumber
   BoolRep     :: StructureRep StructBool
-  OptionalRep :: StructureRep s -> StructureRep (StructOptional s)
-  VectorRep   :: StructureRep s -> StructureRep (StructVector s)
-  SumRep      :: SumTreeRep t -> StructureRep (StructSum t)
-  ProductRep  :: ProductTreeRep t -> StructureRep (StructProduct t)
+  OptionalRep :: !(StructureRep s) -> StructureRep (StructOptional s)
+  VectorRep   :: !(StructureRep s) -> StructureRep (StructVector s)
+  SumRep      :: !(SumTreeRep t) -> StructureRep (StructSum t)
+  ProductRep  :: !(ProductTreeRep t) -> StructureRep (StructProduct t)
 
 data SumTreeRep :: SumTree -> * where
   Sum1Rep
     :: (KnownSymbol t)
     => Proxy t
-    -> StructureRep s
+    -> !(StructureRep s)
     -> SumTreeRep ('Sum1 t s)
   Sum2Rep
-    :: SumTreeRep t1
-    -> SumTreeRep t2
+    :: !(SumTreeRep t1)
+    -> !(SumTreeRep t2)
     -> SumTreeRep ('Sum2 t1 t2)
 
 data ProductTreeRep :: ProductTree -> * where
@@ -35,11 +35,11 @@ data ProductTreeRep :: ProductTree -> * where
   Product1Rep
     :: (KnownSymbol t)
     => Proxy t
-    -> StructureRep s
+    -> !(StructureRep s)
     -> ProductTreeRep ('Product1 t s)
   Product2Rep
-    :: ProductTreeRep t1
-    -> ProductTreeRep t2
+    :: !(ProductTreeRep t1)
+    -> !(ProductTreeRep t2)
     -> ProductTreeRep ('Product2 t1 t2)
 
 instance ToJSON (StructureRep s) where

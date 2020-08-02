@@ -1,5 +1,6 @@
 module Tolstoy.Structure.Class where
 
+import           Data.Int
 import           Data.Proxy
 import           Data.Scientific
 import           Data.Text (Text)
@@ -43,6 +44,16 @@ instance Structural Scientific where
 
 instance Structural Int where
   type StructKind Int = 'StructNumber
+  toStructValue = NumberValue . realToFrac
+  fromStructValue (NumberValue v) = fromInteger $ round v
+
+instance Structural Int32 where
+  type StructKind Int32 = 'StructNumber
+  toStructValue = NumberValue . realToFrac
+  fromStructValue (NumberValue v) = fromInteger $ round v
+
+instance Structural Int64 where
+  type StructKind Int64 = 'StructNumber
   toStructValue = NumberValue . realToFrac
   fromStructValue (NumberValue v) = fromInteger $ round v
 

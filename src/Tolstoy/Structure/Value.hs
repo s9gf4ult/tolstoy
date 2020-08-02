@@ -17,25 +17,33 @@ import           Test.QuickCheck.Instances ()
 import           Tolstoy.Structure.Kind
 
 data StructureValue :: Structure -> * where
-  StringValue   :: Text -> StructureValue 'StructString
-  NumberValue   :: Scientific -> StructureValue 'StructNumber
-  BoolValue     :: Bool -> StructureValue 'StructBool
-  OptionalValue :: Maybe (StructureValue s) -> StructureValue ('StructOptional s)
-  VectorValue   :: Vector (StructureValue s) -> StructureValue ('StructVector s)
-  SumValue      :: SumTreeValue t -> StructureValue ('StructSum t)
-  ProductValue  :: ProductTreeValue t -> StructureValue ('StructProduct t)
+  StringValue   :: !Text -> StructureValue 'StructString
+  NumberValue   :: !Scientific -> StructureValue 'StructNumber
+  BoolValue     :: !Bool -> StructureValue 'StructBool
+  OptionalValue
+    :: !(Maybe (StructureValue s))
+    -> StructureValue ('StructOptional s)
+  VectorValue
+    :: !(Vector (StructureValue s))
+    -> StructureValue ('StructVector s)
+  SumValue
+    :: !(SumTreeValue t)
+    -> StructureValue ('StructSum t)
+  ProductValue
+    :: !(ProductTreeValue t)
+    -> StructureValue ('StructProduct t)
 
 data SumTreeValue :: SumTree -> * where
   Sum1Value
     :: (KnownSymbol n)
     => Proxy n
-    -> StructureValue s
+    -> !(StructureValue s)
     -> SumTreeValue ('Sum1 n s)
   Sum2Left
-    :: SumTreeValue t1
+    :: !(SumTreeValue t1)
     -> SumTreeValue ('Sum2 t1 t2)
   Sum2Right
-    :: SumTreeValue t2
+    :: !(SumTreeValue t2)
     -> SumTreeValue ('Sum2 t1 t2)
 
 data ProductTreeValue :: ProductTree -> * where
@@ -43,11 +51,11 @@ data ProductTreeValue :: ProductTree -> * where
   Product1Value
     :: (KnownSymbol n)
     => Proxy n
-    -> StructureValue s
+    -> !(StructureValue s)
     -> ProductTreeValue ('Product1 n s)
   Product2Value
-    :: ProductTreeValue t1
-    -> ProductTreeValue t2
+    :: !(ProductTreeValue t1)
+    -> !(ProductTreeValue t2)
     -> ProductTreeValue ('Product2 t1 t2)
 
 emptyValue :: StructureValue StructureEmpty

@@ -21,8 +21,7 @@ data SomeStructureValue where
     , Eq (StructureValue s)
     , Arbitrary (StructureValue s)
     , Typeable (StructureValue s)
-    , Typeable s
-    )
+    , Typeable s )
     => StructureValue s
     -> SomeStructureValue
 
