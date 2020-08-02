@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1e6bef560d2ad3313d3ef7a02bc467d2ee0973aff6aa0b779b9fc817aad68e4e
+-- hash: 383b6665f34c97669a6f1f95f00d6b43075dd4800c39cbc56af476647093f85c
 
 name:           tolstoy
 version:        0.0.1
@@ -27,7 +27,9 @@ source-repository head
 
 library
   exposed-modules:
+      Test.Tolstoy.Migrations
       Tolstoy.DB
+      Tolstoy.Migration
       Tolstoy.Structure
       Tolstoy.Structure.Class
       Tolstoy.Structure.Kind
@@ -45,6 +47,7 @@ library
     , base >=4.7 && <5
     , bytestring
     , containers
+    , deepseq
     , generic-lens
     , lens
     , postgresql-query

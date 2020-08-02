@@ -19,6 +19,7 @@ dependencies:
   - bytestring
   - containers
   - generic-lens
+  - deepseq
   - lens
   - postgresql-query
   - postgresql-simple
