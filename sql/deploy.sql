@@ -17,3 +17,13 @@ CREATE TABLE ^{documents} (
   created_at         timestamp with time zone DEFAULT NOW() NOT NULL,
   action_id          uuid NOT NULL REFERENCES ^{actions}(id)
 );
+
+CREATE TABLE ^{versions} (
+  id                 uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at         timestamp with time zone DEFAULT NOW() NOT NULL,
+  doctype            text NOT NULL,
+  "version"          bigint NOT NULL,
+  structure_rep      jsonb NOT NULL,
+  -- Description of the document structure
+  UNIQUE (doctype, "version", structure_rep)
+);
