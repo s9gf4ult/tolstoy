@@ -40,6 +40,17 @@ actionsHistory a actions = NE.nonEmpty $ go a
     actMap :: M.Map (ActId act) (ActionRow doc act)
     actMap = M.fromList $ (view (field @"actionId") &&& id) <$> actions
 
+initQueries :: TolstoyInit doc act a -> TolstoyQueries doc act
+initQueries init = TolstoyQueries { deploy, revert, documentsList, actionsList }
+  where
+    documents = documentsTable init
+    actions = actionsTable init
+    versions = versionsTable init
+    documentsList = $(sqlExpFile "documentsList")
+    deploy = $(sqlExpFile "deploy")
+    revert = $(sqlExpFile "revert")
+    actionsList actId = $(sqlExpFile "actionsList")
+
 tolstoy
   :: forall m doc act a
   .  ( MonadPostgres m
@@ -53,15 +64,7 @@ tolstoy init =
   Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments, queries }
   where
     docs = documentsTable
-    queries = TolstoyQueries { deploy, revert, documentsList, actionsList }
-      where
-        documents = documentsTable init
-        actions = actionsTable init
-        versions = versionsTable init
-        documentsList = $(sqlExpFile "listDocuments")
-        deploy = $(sqlExpFile "deploy")
-        revert = $(sqlExpFile "revert")
-        actionsList actId = $(sqlExpFile "actionsList")
+    queries = initQueries init
     newDoc doc act = do
       [(actId, modified)] <- pgQuery [sqlExp|
         INSERT INTO ^{actionsTable init} (document, action)

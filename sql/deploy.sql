@@ -9,7 +9,9 @@ CREATE TABLE ^{actions} (
   -- parent_id is NULL then the record is the first record in the
   -- history list.
   document           jsonb NOT NULL,
-  action             jsonb NOT NULL
+  document_version   bigint NOT NULL,
+  action             jsonb NOT NULL,
+  action_version     bigint NOT NULL
 );
 
 CREATE TABLE ^{documents} (
