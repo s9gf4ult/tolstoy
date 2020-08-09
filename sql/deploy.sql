@@ -10,6 +10,7 @@ CREATE TABLE ^{actions} (
   -- history list.
   document           jsonb NOT NULL,
   document_version   bigint NOT NULL,
+  -- The version number described in the "versions" table
   action             jsonb NOT NULL,
   action_version     bigint NOT NULL
 );
@@ -20,10 +21,13 @@ CREATE TABLE ^{documents} (
   action_id          uuid NOT NULL REFERENCES ^{actions}(id)
 );
 
+CREATE TYPE ^{doctypeName} AS ENUM
+  ( 'document', 'action' ) ;
+
 CREATE TABLE ^{versions} (
   id                 uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   created_at         timestamp with time zone DEFAULT NOW() NOT NULL,
-  doctype            text NOT NULL,
+  doctype            ^{doctypeName} NOT NULL,
   "version"          bigint NOT NULL,
   structure_rep      jsonb NOT NULL,
   -- Description of the document structure

@@ -4,6 +4,7 @@ import           Control.Arrow
 import           Control.Lens
 import           Control.Monad.Fail
 import           Data.Aeson
+import           Data.Char as C
 import           Data.Generics.Product
 import           Data.List.NonEmpty as NE
 import qualified Data.Map as M
@@ -57,6 +58,11 @@ type StructuralJSON doc =
   , Typeable (StructureValue (StructKind doc))
   , FromJSON (StructureValue (StructKind doc))
   , ToJSON (StructureValue (StructKind doc)) )
+
+data Doctype = Document | Action
+  deriving (Eq, Ord, Show, Generic)
+
+derivePgEnum (fmap C.toLower) ''Doctype
 
 data DocDesc doc act = DocDesc
   { doc      :: doc
@@ -119,10 +125,11 @@ instance
     return $ ActionRow {..}
 
 data TolstoyInit doc act a = TolstoyInit
-  { docAction      :: DocAction doc act a
-  , documentsTable :: FN
-  , actionsTable   :: FN
-  , versionsTable  :: FN
+  { docAction       :: DocAction doc act a
+  , documentsTable  :: FN
+  , actionsTable    :: FN
+  , versionsTable   :: FN
+  , doctypeTypeName :: FN
   } deriving (Generic)
 
 data Tolstoy m doc act a = Tolstoy

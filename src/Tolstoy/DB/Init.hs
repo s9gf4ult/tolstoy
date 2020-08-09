@@ -46,6 +46,7 @@ initQueries init = TolstoyQueries { deploy, revert, documentsList, actionsList }
     documents = documentsTable init
     actions = actionsTable init
     versions = versionsTable init
+    doctypeName = doctypeTypeName init
     documentsList = $(sqlExpFile "documentsList")
     deploy = $(sqlExpFile "deploy")
     revert = $(sqlExpFile "revert")
