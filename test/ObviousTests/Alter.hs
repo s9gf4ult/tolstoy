@@ -40,11 +40,13 @@ data Prod5 = Prod5
 instance Structural Prod5
 instance NFData Prod5
 
-data Wrapped = Wrapped Single
+data SSum a = SSum a
   deriving (Eq, Ord, Show, Generic)
-instance Structural Wrapped
+instance (Structural a) => Structural (SSum a)
+instance (NFData a) => NFData (SSum a)
 
-data Single = Single
-  { single :: Int
+data SProd a = SProd
+  { single :: a
   } deriving (Eq, Ord, Show, Generic)
-instance Structural Single
+instance (Structural a) => Structural (SProd a)
+instance (NFData a) => NFData (SProd a)

@@ -25,6 +25,15 @@ sumAtoB = obviousMigration
 sumAtoC :: SumA -> SumC
 sumAtoC = obviousMigration
 
+intToSProd :: Int -> SProd Int
+intToSProd = obviousMigration
+
+intToSSum :: Int -> SSum Int
+intToSSum = obviousMigration
+
+intToComplex :: Int -> SProd (SSum (Maybe (SProd Int)))
+intToComplex = obviousMigration
+
 test_Obvious :: TestTree
 test_Obvious = testGroup "Obvious migrations"
   [ testProperty "Prod1 -> Prod2" $ total . data1To2
@@ -33,4 +42,7 @@ test_Obvious = testGroup "Obvious migrations"
   , testProperty "Prod1 -> Prod5" $ total . data1To5
   , testProperty "SumA -> SumB" $ total . sumAtoB
   , testProperty "SumA -> SumC" $ total . sumAtoC
+  , testProperty "Int -> SProd" $ total . intToSProd
+  , testProperty "Int -> SSum" $ total . intToSSum
+  , testProperty "Int -> SProd (SSum (Maybe (SProd Int)))" $ total . intToComplex
   ]
