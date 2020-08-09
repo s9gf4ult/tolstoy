@@ -20,7 +20,7 @@ instance NFData Prod2
 
 data Prod3 = Prod3
   { b :: Maybe Int
-  , c :: Vector Int
+  , c :: Vector (Maybe Int)
   } deriving (Eq, Ord, Show, Generic)
 instance Structural Prod3
 instance NFData Prod3
@@ -30,6 +30,15 @@ data Prod4 = Prod4
   } deriving (Eq, Ord, Show, Generic)
 instance Structural Prod4
 instance NFData Prod4
+
+data Prod5 = Prod5
+  { a :: String
+  , b :: Int
+  , c :: Maybe Int
+  , d :: Maybe String
+  } deriving (Eq, Ord, Show, Generic)
+instance Structural Prod5
+instance NFData Prod5
 
 data Wrapped = Wrapped Single
   deriving (Eq, Ord, Show, Generic)

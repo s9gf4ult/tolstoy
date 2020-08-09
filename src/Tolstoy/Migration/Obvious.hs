@@ -20,7 +20,6 @@ class Obvious (s1 :: Structure) (s2 :: Structure) where
 
 -- $ One to one transform
 
-
 instance Obvious 'StructString 'StructString where
   obvious = id
 
@@ -101,13 +100,6 @@ instance
   obvious = VectorValue . pure . obvious
 
 
--- -- $ Change the container
-
--- instance (Obvious s1 s2) => Obvious ('StructOptional s1) ('StructVector s2) where
---   obvious (OptionalValue v) = case v of
---     Just s1 -> VectorValue $ pure $ obvious s1
---     Nothing -> VectorValue mempty
-
 -- $ Wrap into the product
 
 instance
@@ -140,33 +132,6 @@ instance
   ) => Obvious ('StructVector s1) ('StructProduct ('Product1 n s2)) where
   obvious s1 = ProductValue $ Product1Value Proxy (obvious s1)
 
--- $ Unwrap from single element product
-
--- instance
---   ( Obvious s 'StructString
---   ) => Obvious ('StructSum ('Sum1 n s)) 'StructString where
---   obvious (SumValue (Sum1Value _proxy s1)) = obvious s1
-
--- instance
---   ( Obvious s 'StructNumber
---   ) => Obvious ('StructSum ('Sum1 n s)) 'StructNumber where
---   obvious (SumValue (Sum1Value _proxy s1)) = obvious s1
-
--- instance
---   ( Obvious s 'StructBool
---   ) => Obvious ('StructSum ('Sum1 n s)) 'StructBool where
---   obvious (SumValue (Sum1Value _proxy s1)) = obvious s1
-
--- instance
---   ( Obvious s1 ('StructOptional s2)
---   ) => Obvious ('StructSum ('Sum1 n s1)) ('StructOptional s2) where
---   obvious (SumValue (Sum1Value _proxy s1)) = obvious s1
-
--- instance
---   ( Obvious s1 ('StructVector s2)
---   ) => Obvious ('StructSum ('Sum1 n s1)) ('StructVector s2) where
---   obvious (SumValue (Sum1Value _proxy s1)) = obvious s1
-
 -- $ Wrap in single element sum
 
 instance
@@ -198,33 +163,6 @@ instance
   , KnownSymbol n
   ) => Obvious ('StructVector s1) ('StructSum ('Sum1 n s2)) where
   obvious s1 = SumValue $ Sum1Value Proxy (obvious s1)
-
--- $ Unwrap single element sum
-
--- instance
---   ( Obvious s 'StructString
---   ) => Obvious ('StructProduct ('Product1 n s)) 'StructString where
---   obvious (ProductValue (Product1Value _proxy s1)) = obvious s1
-
--- instance
---   ( Obvious s 'StructNumber
---   ) => Obvious ('StructProduct ('Product1 n s)) 'StructNumber where
---   obvious (ProductValue (Product1Value _proxy s1)) = obvious s1
-
--- instance
---   ( Obvious s 'StructBool
---   ) => Obvious ('StructProduct ('Product1 n s)) 'StructBool where
---   obvious (ProductValue (Product1Value _proxy s1)) = obvious s1
-
--- instance
---   ( Obvious s1 ('StructOptional s2)
---   ) => Obvious ('StructProduct ('Product1 n s1)) ('StructOptional s2) where
---   obvious (ProductValue (Product1Value _proxy s1)) = obvious s1
-
--- instance
---   ( Obvious s1 ('StructVector s2)
---   ) => Obvious ('StructProduct ('Product1 n s1)) ('StructVector s2) where
---   obvious (ProductValue (Product1Value _proxy s1)) = obvious s1
 
 -- $ Product transformation
 
