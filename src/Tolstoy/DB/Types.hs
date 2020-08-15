@@ -125,11 +125,11 @@ instance
     return $ ActionRow {..}
 
 data TolstoyInit doc act a = TolstoyInit
-  { docAction       :: DocAction doc act a
-  , documentsTable  :: FN
-  , actionsTable    :: FN
-  , versionsTable   :: FN
-  , doctypeTypeName :: FN
+  { docAction       :: !(DocAction doc act a)
+  , documentsTable  :: !FN
+  , actionsTable    :: !FN
+  , versionsTable   :: !FN
+  , doctypeTypeName :: !FN
   } deriving (Generic)
 
 data Tolstoy m doc act a = Tolstoy

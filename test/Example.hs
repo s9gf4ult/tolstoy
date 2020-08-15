@@ -124,7 +124,10 @@ openDB = do
     tlst = tolstoy $ TolstoyInit
       { docAction = userAction
       , documentsTable = "documents"
-      , actionsTable = "actions" }
+      , actionsTable = "actions"
+      , versionsTable = "versions"
+      , doctypeTypeName = "doctype"
+      }
   void $ runTest p $ do
     pgExecute $ tlst ^. field @"queries" . field @"deploy"
   return (tlst, p)

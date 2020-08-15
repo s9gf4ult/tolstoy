@@ -68,6 +68,8 @@ default-extensions:
 
 ghc-options:
   - -Wall
+ghc-prof-options:
+  - -fprof-auto
 
 library:
   source-dirs: src

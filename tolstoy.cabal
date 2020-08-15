@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bc537ceab5f83d089344df7660a0d8b97c9941889cd4811cae521946cbfa1c6a
+-- hash: da4ce13cb18d5e6da5f98844bfd0e6f3be1cb8be506fac42f8ea785d1f8553aa
 
 name:           tolstoy
 version:        0.0.1
@@ -44,6 +44,7 @@ library
       src
   default-extensions: ConstraintKinds DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveTraversable DuplicateRecordFields FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NumDecimals OverloadedStrings PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeFamilies TypeOperators UndecidableInstances ViewPatterns
   ghc-options: -Wall
+  ghc-prof-options: -fprof-auto
   build-depends:
       QuickCheck
     , aeson
@@ -84,6 +85,7 @@ test-suite tolstoy-test
       test
   default-extensions: ConstraintKinds DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveTraversable DuplicateRecordFields FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NumDecimals OverloadedStrings PolyKinds QuasiQuotes RankNTypes RecordWildCards ScopedTypeVariables StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeFamilies TypeOperators UndecidableInstances ViewPatterns
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-prof-options: -fprof-auto
   build-tool-depends:
       autoexporter:autoexporter
   build-depends:

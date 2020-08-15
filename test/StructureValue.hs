@@ -33,8 +33,13 @@ instance Eq SomeStructureValue where
     Just a' -> a' == b
     Nothing -> False
 
+resizeStruct :: Gen a -> Gen a
+resizeStruct = scale (\a -> max 0 $ a - 10)
+
 instance Arbitrary SomeStructureValue where
-  arbitrary = oneof allCases
+  arbitrary = sized $ \case
+    0 -> prod0
+    _ -> oneof allCases
     where
       allCases =
         [ SomeStructureValue . StringValue <$> arbitrary
@@ -42,66 +47,77 @@ instance Arbitrary SomeStructureValue where
         , SomeStructureValue . BoolValue <$> arbitrary
         , opt
         , vec
-        , sumSt
-        , prod
+        , sum2
+        , sum1
+        , prod2
+        , prod1
+        , prod0
         ]
       opt = do
-        SomeStructureValue s <- arbitrary
-        sub <- oneof [ pure $ Just s, pure Nothing ]
+        SomeStructureValue (s :: StructureValue s) <- resizeStruct arbitrary
+        sub <- sized $ \case
+          0 -> pure Nothing
+          _ -> oneof [ pure $ Just s, pure Nothing ]
         return $ SomeStructureValue $ OptionalValue sub
       vec = do
-        SomeStructureValue (_ :: StructureValue s) <- arbitrary
-        v <- arbitrary :: Gen (Vector (StructureValue s))
+        SomeStructureValue (_ :: StructureValue s) <- resizeStruct arbitrary
+        v <- resizeStruct arbitrary :: Gen (Vector (StructureValue s))
         return $ SomeStructureValue $ VectorValue v
-      sumSt = do
-        SomeStructureValue (_ :: StructureValue s1) <- arbitrary
-        SomeStructureValue (_ :: StructureValue s2) <- arbitrary
-        s <- arbitrary
-          :: Gen (SumTreeValue ('Sum2 ('Sum1 "some" s1) ('Sum1 "other" s2)))
+      sum2 = do
+        SomeStructureValue (s1 :: StructureValue s1) <- resizeStruct arbitrary
+        SomeStructureValue (s2 :: StructureValue s2) <- resizeStruct arbitrary
+        let
+          -- a :: Gen (SumTreeValue ('Sum2 ('Sum1 "this" s1) ('Sum1 "that" s2)))
+          a = do
+            return $ Sum2Left $ Sum1Value (Proxy @"this") s1
+          b = do
+            return $ Sum2Right $ Sum1Value (Proxy @"that") s2
+        s <- oneof [a, b]
         return $ SomeStructureValue $ SumValue s
-      prod = do
-        SomeStructureValue (_ :: StructureValue s1) <- arbitrary
-        SomeStructureValue (_ :: StructureValue s2) <- arbitrary
-        p <- arbitrary :: Gen (ProductTreeValue
-                               ('Product2
-                                ('Product1 "some" s1)
-                                ('Product1 "other" s2)))
-        return $ SomeStructureValue $ ProductValue p
+      sum1 = do
+        SomeStructureValue s <- resizeStruct arbitrary
+        return $ SomeStructureValue $ SumValue $ Sum1Value (Proxy @"single") s
+      prod2 = do
+        SomeStructureValue (s1 :: StructureValue s1) <- resizeStruct arbitrary
+        SomeStructureValue (s2 :: StructureValue s2) <- resizeStruct arbitrary
+        return $ SomeStructureValue $ ProductValue $ Product2Value
+          (Product1Value (Proxy @"some") s1)
+          (Product1Value (Proxy @"other") s2)
+      prod1 = do
+        SomeStructureValue s <- resizeStruct arbitrary
+        return $ SomeStructureValue $ ProductValue
+          $ Product1Value (Proxy @"single") s
+      prod0 = pure $ SomeStructureValue $ ProductValue Product0Value
 
-someStructure :: Gen SomeStructureValue
-someStructure = suchThat arbitrary noJustNothing
-
-noJustNothing :: SomeStructureValue -> Bool
-noJustNothing (SomeStructureValue a) = go a
+-- | Turn all @Just Nothing@ to just @Nothing@. Needed because in json
+-- we can not distinguish between @null@ and @just null@.
+noJustNothing :: StructureValue s -> StructureValue s
+noJustNothing a = go a
   where
-    go :: StructureValue s -> Bool
+    go :: StructureValue s -> StructureValue s
     go = \case
-      StringValue {} -> True
-      NumberValue {} -> True
-      BoolValue {}   -> True
-      OptionalValue (Just sub) -> case sub of
-        OptionalValue Nothing -> False
-        _                     -> go sub
-      OptionalValue Nothing -> True
-      VectorValue v -> P.all go v
-      SumValue s -> goSum s
-      ProductValue p -> goProd p
-    goSum :: SumTreeValue t -> Bool
+      OptionalValue (Just sub) -> case go sub of
+        OptionalValue Nothing -> OptionalValue Nothing
+        clear                 -> OptionalValue $ Just clear
+      VectorValue v -> VectorValue $ go <$> v
+      SumValue s -> SumValue $ goSum s
+      ProductValue p -> ProductValue $ goProd p
+      clear -> clear
+    goSum :: SumTreeValue t -> SumTreeValue t
     goSum = \case
-      Sum1Value _ s -> go s
-      Sum2Left l -> goSum l
-      Sum2Right r -> goSum r
-    goProd :: ProductTreeValue t -> Bool
+      Sum1Value p s -> Sum1Value p $ go s
+      Sum2Left l -> Sum2Left $ goSum l
+      Sum2Right r -> Sum2Right $ goSum r
+    goProd :: ProductTreeValue t -> ProductTreeValue t
     goProd = \case
-      Product0Value -> True
-      Product1Value _ s -> go s
-      Product2Value p1 p2 -> goProd p1 && goProd p2
+      Product0Value -> Product0Value
+      Product1Value p s -> Product1Value p $ go s
+      Product2Value p1 p2 -> Product2Value (goProd p1) (goProd p2)
 
 test_StructureValue :: TestTree
 test_StructureValue = testGroup "Pure tests"
   [ testProperty "ToJSON/FromJSON (StructureValue s)"
-    $ forAll someStructure
-    $ \(s :: SomeStructureValue) -> case s of
+    $ \s -> case s of
       SomeStructureValue (v :: StructureValue s) ->
-        Just v === J.decode (J.encode v)
+        Just (noJustNothing v) === J.decode (J.encode v)
   ]
