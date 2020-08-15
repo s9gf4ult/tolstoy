@@ -34,7 +34,7 @@ instance Eq SomeStructureValue where
     Nothing -> False
 
 resizeStruct :: Gen a -> Gen a
-resizeStruct = scale (\a -> max 0 $ a - 10)
+resizeStruct = scale (\a -> max 0 $ a - 20)
 
 instance Arbitrary SomeStructureValue where
   arbitrary = sized $ \case
