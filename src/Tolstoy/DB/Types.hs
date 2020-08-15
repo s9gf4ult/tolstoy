@@ -19,6 +19,7 @@ import qualified Database.PostgreSQL.Simple.FromRow as PG
 import           Database.PostgreSQL.Simple.ToField
 import           GHC.Generics (Generic)
 import           GHC.Stack
+import           Tolstoy.Migration
 import           Tolstoy.Structure
 
 
@@ -65,64 +66,110 @@ data Doctype = Document | Action
 derivePgEnum (fmap C.toLower) ''Doctype
 
 data DocDesc doc act = DocDesc
-  { doc      :: doc
-  , docId    :: DocId doc
-  , act      :: act
-  , actId    :: ActId act
-  , created  :: UTCTime
-  , modified :: UTCTime
+  { document        :: doc
+  , documentId      :: DocId doc
+  , documentVersion :: Integer
+  -- ^ Original version number
+  , action          :: act
+  , actionId        :: ActId act
+  , actionVersion   :: Integer
+  -- ^ Original version number
+  , created         :: UTCTime
+  , modified        :: UTCTime
   } deriving (Eq, Ord, Show, Generic)
 
-instance
-  (StructuralJSON doc, StructuralJSON act
-  ) => FromRow (DocDesc doc act) where
-  fromRow = do
-    JsonField docValue <- PG.field
-    let doc = fromStructValue docValue
-    docId <- PG.field
-    JsonField actValue <- PG.field
-    let act = fromStructValue actValue
-    actId <- PG.field
-    created <- PG.field
-    modified <- PG.field
-    return $ DocDesc {..}
+-- | Convenient type to parse DocDesc from sql
+data DocDescRaw = DocDescRaw
+  { document        :: JsonField Value
+  , documentId      :: UUID
+  , documentVersion :: Integer
+  , action          :: JsonField Value
+  , actionId        :: UUID
+  , actionVersion   :: Integer
+  , created         :: UTCTime
+  , modified        :: UTCTime
+  } deriving (Eq, Show, Generic)
+
+instance FromRow DocDescRaw
+
+migrateDocDesc
+  :: forall n1 docs n2 acts doc act
+  .  (doc ~ Last docs, act ~ Last acts)
+  => Migrations n1 docs
+  -> Migrations n2 acts
+  -> DocDescRaw
+  -> MigrationResult (DocDesc doc act)
+migrateDocDesc docMigs actMigs raw = do
+  document <- migrate
+    (raw ^. field @"documentVersion")
+    (unJsonField $ raw ^. field @"document")
+    docMigs
+  action <- migrate
+    (raw ^. field @"actionVersion")
+    (unJsonField $ raw ^. field @"action")
+    actMigs
+  return $ DocDesc
+    { document
+    , documentId = DocId $ raw ^. field @"documentId"
+    , documentVersion = raw ^. field @"documentVersion"
+    , action
+    , actionId = ActId $ raw ^. field @"actionId"
+    , actionVersion = raw ^. field @"actionVersion"
+    , created = raw ^. field @"created"
+    , modified = raw ^. field @"modified"
+    }
+
 
 data DocHistory doc act = DocHistory
-  { docId   :: DocId doc
-  , created :: UTCTime
-  , history :: NonEmpty (Story doc act)
+  { documentId :: DocId doc
+  , created    :: UTCTime
+  , history    :: NonEmpty (Story doc act)
   -- ^ Story points in reverse order. Head is the last actual version
   -- and tail is the initial
   } deriving (Eq, Ord, Show, Generic)
 
 data Story doc act = Story
-  { doc      :: doc
-  , act      :: act
-  , actId    :: ActId act
-  , modified :: UTCTime
+  { document      :: doc
+  , action        :: act
+  , actionId      :: ActId act
+  , actionVersion :: Integer
+  , modified      :: UTCTime
   } deriving (Eq, Ord, Show, Generic)
 
-data ActionRow doc act = ActionRow
-  { actionId :: ActId act
-  , created  :: UTCTime
-  , parentId :: Maybe (ActId act)
-  , document :: doc
-  , action   :: act
-  } deriving (Eq, Ord, Show, Generic)
+data ActionRaw = ActionRaw
+  { actionId         :: UUID
+  , created          :: UTCTime
+  , parentId         :: UUID
+  , document         :: JsonField Value
+  , document_version :: Integer
+  , action           :: JsonField Value
+  , action_version   :: Integer
+  } deriving (Eq, Show, Generic)
 
-instance
-  ( StructuralJSON doc, StructuralJSON act
-  ) => FromRow (ActionRow doc act) where
-  fromRow = do
-    actionId <- PG.field
-    created <- PG.field
-    parentId <- PG.field
-    JsonField docVal  <- PG.field
-    JsonField actVal <- PG.field
-    let
-      document = fromStructValue docVal
-      action = fromStructValue actVal
-    return $ ActionRow {..}
+instance FromRow ActionRaw
+
+actionsHistory
+  :: forall n1 docs n2 acts doc act
+  . (act ~ Last acts, doc ~ Last docs)
+  => Migrations n1 docs
+  -> Migrations n2 acts
+  -> ActId act
+  -> [ActionRaw]
+  -> Maybe (NonEmpty (Story doc act))
+actionsHistory a actions = NE.nonEmpty $ go a
+  where
+    go actId = case M.lookup actId actMap of
+      Nothing -> []
+      Just h  -> toStory h
+        : (h ^.. field @"parentId" . _Just . to go . traversed)
+    toStory h = Story
+      { document = h ^. field @"document"
+      , action = h ^. field @"action"
+      , actionId = h ^. field @"actionId"
+      , actionVersion = h ^. field @"actionVersion"
+      , modified = h ^. field @"created" }
+    actMap :: M.Map (ActId act) (ActionRow doc act)
+    actMap = M.fromList $ (view (field @"actionId") &&& id) <$> actions
 
 data TolstoyInit doc act a = TolstoyInit
   { docAction       :: !(DocAction doc act a)
@@ -143,7 +190,7 @@ data Tolstoy m doc act a = Tolstoy
   -- ^ Inserts a new document in DB
   , getDoc
     :: DocId doc
-    -> m (Maybe (DocDesc doc act))
+    -> m (Maybe (MigrationResult (DocDesc doc act)))
   -- ^ Get last version of some object
   , getDocHistory
     :: DocId doc

@@ -2,6 +2,7 @@ module Tolstoy.Migration where
 
 import Data.Aeson as J
 import Data.Proxy
+import Data.Typeable
 import GHC.Generics (Generic)
 import GHC.TypeLits
 import Tolstoy.Structure
@@ -9,14 +10,14 @@ import Tolstoy.Structure
 data Migrations :: Nat -> [*] -> * where
   Migrate
     :: ( Structural a, Structural b
-       , KnownNat n
+       , KnownNat n, Typeable a
        , FromJSON (StructureValue (StructKind a)) )
     => Proxy n
     -> (a -> b)
     -> Migrations (n + 1) (b ': rest)
     -> Migrations n (a ': b ': rest)
   LastVersion
-    :: ( KnownNat n, Structural a
+    :: ( KnownNat n, Structural a, Typeable a
        , FromJSON (StructureValue (StructKind a)) )
     => Proxy n
     -> Proxy a
@@ -25,8 +26,8 @@ data Migrations :: Nat -> [*] -> * where
 type MigrationResult = Either MigrationError
 
 data MigrationError
-  = AesonError String
-  | NoMoreVersions Integer
+  = AesonError TypeRep String
+  | NoMoreVersions TypeRep Integer
   | VersionOutOfBounds Integer
   deriving (Eq, Ord, Show, Generic)
 
@@ -34,6 +35,13 @@ type family Last (els :: [*]) where
   Last (a ': b ': rest) = Last (b ': rest)
   Last '[a]             = a
 
+lastVersion :: Migrations n els -> Integer
+lastVersion = \case
+  Migrate _ _ rest -> lastVersion rest
+  LastVersion n _  -> natVal n
+
+-- | Finds type the @Value@ should be parsed as, then applies migrations
+-- to it. The result is the last type in the migrations list.
 migrate
   :: forall n els
   .  Integer
@@ -42,28 +50,30 @@ migrate
   -> MigrationResult (Last els)
 migrate n v migrations = case migrations of
   LastVersion pN (_ :: Proxy a) -> if natVal pN == n
-    then aesonResult $ up <$> fromJSON v
-    else Left $ NoMoreVersions $ natVal pN
+    then up <$> aesonResult (fromJSON v)
+    else Left $ NoMoreVersions (typeRep (Proxy @a)) $ natVal pN
     where
-      up :: StructureValue (StructKind a) -> a
-      up = fromStructValue
+      up :: a -> a
+      up = id
   Migrate pN (_ :: a -> b) rest -> case compare n (natVal pN) of
     GT -> migrate n v rest
-    EQ -> aesonResult $ up <$> fromJSON v
+    EQ -> up <$> aesonResult (fromJSON v)
     LT -> Left $ VersionOutOfBounds $ natVal pN
     where
-      up :: StructureValue (StructKind a) -> Last els
-      up a = applyMigrations (fromStructValue a) migrations
+      up :: a -> Last els
+      up a = applyMigrations a migrations
 
 applyMigrations :: a -> Migrations n (a ': rest) -> Last (a ': rest)
 applyMigrations a = \case
   LastVersion _ _  -> a
   Migrate _ f rest -> applyMigrations (f a) rest
 
-aesonResult :: J.Result a -> MigrationResult a
+aesonResult :: forall a. (Typeable a, Structural a)
+  => J.Result (StructureValue (StructKind a))
+  -> MigrationResult a
 aesonResult = \case
-  J.Error a   -> Left $ AesonError a
-  J.Success a -> Right a
+  J.Error a   -> Left $ AesonError (typeRep (Proxy @a)) a
+  J.Success a -> Right $ fromStructValue a
 
 
 -- class Migrate (n :: Nat) (els :: [*]) (a :: *) (result :: *) where

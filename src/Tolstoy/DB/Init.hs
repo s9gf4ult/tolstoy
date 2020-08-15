@@ -19,26 +19,8 @@ import           Database.PostgreSQL.Simple.ToField
 import           GHC.Generics (Generic)
 import           GHC.Stack
 import           Tolstoy.DB.Types
+import           Tolstoy.Migration
 import           Tolstoy.Structure
-
-actionsHistory
-  :: forall doc act
-  .  ActId act
-  -> [ActionRow doc act]
-  -> Maybe (NonEmpty (Story doc act))
-actionsHistory a actions = NE.nonEmpty $ go a
-  where
-    go actId = case M.lookup actId actMap of
-      Nothing -> []
-      Just h  -> toStory h
-        : (h ^.. field @"parentId" . _Just . to go . traversed)
-    toStory h = Story
-      { doc = h ^. field @"document"
-      , act = h ^. field @"action"
-      , actId = h ^. field @"actionId"
-      , modified = h ^. field @"created" }
-    actMap :: M.Map (ActId act) (ActionRow doc act)
-    actMap = M.fromList $ (view (field @"actionId") &&& id) <$> actions
 
 initQueries :: TolstoyInit doc act a -> TolstoyQueries doc act
 initQueries init = TolstoyQueries { deploy, revert, documentsList, actionsList }
@@ -50,76 +32,90 @@ initQueries init = TolstoyQueries { deploy, revert, documentsList, actionsList }
     documentsList = $(sqlExpFile "documentsList")
     deploy = $(sqlExpFile "deploy")
     revert = $(sqlExpFile "revert")
-    actionsList actId = $(sqlExpFile "actionsList")
+    actionsList actionId = $(sqlExpFile "actionsList")
 
 tolstoy
-  :: forall m doc act a
+  :: forall m doc act a n1 n2 docs acts
   .  ( MonadPostgres m
      , MonadFail m              -- FIXME: KILL it
      , StructuralJSON doc, StructuralJSON act
      , HasCallStack
+     , doc ~ Last docs
+     , act ~ Last acts
      )
-  => (TolstoyInit doc act a)
+  => Migrations n1 docs
+  -> Migrations n2 acts
+  -> TolstoyInit doc act a
   -> Tolstoy m doc act a
-tolstoy init =
+tolstoy docMigrations actMigrations init =
   Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments, queries }
   where
-    docs = documentsTable
+    docLast = lastVersion docMigrations
+    actLast = lastVersion actMigrations
     queries = initQueries init
-    newDoc doc act = do
-      [(actId, modified)] <- pgQuery [sqlExp|
-        INSERT INTO ^{actionsTable init} (document, action)
-        VALUES ( #{JsonField (toStructValue doc)}
-          , #{JsonField (toStructValue act)} )
+    newDoc document action = do
+      [(actionId, modified)] <- pgQuery [sqlExp|
+        INSERT INTO ^{actionsTable init}
+          (document, document_version, action, action_version)
+        VALUES
+          ( #{JsonField (toStructValue document)}, #{docLast}
+          , #{JsonField (toStructValue action)}, #{actLast} )
         RETURNING id, created_at|]
-      [(docId, created)] <- pgQuery [sqlExp|
+      [(documentId, created)] <- pgQuery [sqlExp|
         INSERT INTO ^{documentsTable init} (action_id)
-        VALUES ( #{actId} )
+        VALUES ( #{actionId} )
         RETURNING id, created_at|]
       let
         res = DocDesc
-          { doc , docId , act , actId , created, modified }
+          { document , documentId , action , actionId , created, modified }
       return res
-    getDoc docId = do
+    getDoc documentId = do
       res <- pgQuery [sqlExp|
-        SELECT * FROM (^{documentsList queries}) as docs where doc_id = #{docId}|]
+        SELECT * FROM (^{documentsList queries}) AS docs
+        WHERE document_id = #{documentId}|]
       case res of
         []        -> return Nothing
-        [docDesc] -> return $ Just docDesc
+        [docDesc] -> return $ Just $ migrateDocDesc docDesc
         _         -> error "Unexpected count of results"
-    getDocHistory docId = do
-      res <- pgQuery [sqlExp|SELECT created_at, action_id
+    getDocHistory documentId = do
+      res <- pgQuery [sqlExp|
+        SELECT created_at, action_id
         FROM ^{documentsTable init}
-        WHERE id = #{docId}|]
+        WHERE id = #{documentId}|]
       case res of
         [] -> return Nothing
-        [(created, actId)] -> do
-          actions <- pgQuery $ actionsList queries actId
+        [(created, actionId)] -> do
+          actions <- pgQuery $ actionsList queries actionId
           case actionsHistory actId actions of
             Nothing      -> error "No actions. Unexpected result"
             Just history -> return $ Just
-              $ DocHistory {docId, created, history}
+              $ DocHistory {documentId, created, history}
 
-    changeDoc docDesc act = case docAction init (docDesc ^. field @"doc") act of
+    changeDoc docDesc action = case docAction init (docDesc ^. field @"document") action of
       Left e       -> return $ Left e
       Right (newDoc, a) -> do
         let
-          parent = docDesc ^. field @"actId"
-          docId = docDesc ^. field @"docId"
+          parent = docDesc ^. field @"actionId"
+          docId = docDesc ^. field @"documentId"
         [(newActId, newMod)] <- pgQuery [sqlExp|
-          INSERT INTO ^{actionsTable init} (parent_id, document, action)
-          VALUES ( #{parent}, #{JsonField (toStructValue newDoc)}
-            , #{JsonField (toStructValue act)})
+          INSERT INTO ^{actionsTable init}
+            (parent_id, document, document_version, action, action_version)
+          VALUES
+            ( #{parent}
+            , #{JsonField (toStructValue newDoc)}, #{lastDoc}
+            , #{JsonField (toStructValue action)}, #{lastAct})
           RETURNING id, created_at|]
         1 <- pgExecute [sqlExp|UPDATE ^{documentsTable init}
           SET action_id = #{newActId}
           WHERE id = #{docId}|]
         let
           res =  DocDesc
-            { doc      = newDoc
-            , docId    = docId
-            , act      = act
-            , actId    = newActId
+            { document      = newDoc
+            , documentId    = docId
+            , documentVersion = lastDoc
+            , action      = action
+            , actionId    = newActId
+            , actionVersion = lastAct
             , created  = docDesc ^. field @"created"
             , modified = newMod }
         return $ Right (res, a)

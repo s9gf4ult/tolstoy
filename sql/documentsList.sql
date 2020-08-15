@@ -1,8 +1,8 @@
 SELECT
-  act.document as doc,
-  doc.id as doc_id,
-  act.action as act,
-  act.id as act_id,
+  act.document as document,
+  doc.id as document_id,
+  act."action" as "action",
+  act.id as action_id,
   doc.created_at as created,
   act.created_at as modified
   FROM ^{documents} as doc

@@ -11,7 +11,7 @@ CREATE TABLE ^{actions} (
   document           jsonb NOT NULL,
   document_version   bigint NOT NULL,
   -- The version number described in the "versions" table
-  action             jsonb NOT NULL,
+  "action"           jsonb NOT NULL,
   action_version     bigint NOT NULL
 );
 
