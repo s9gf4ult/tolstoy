@@ -13,14 +13,15 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/tolstoy#readme>
 
 dependencies:
-  - base >= 4.7 && < 5
   - QuickCheck
   - aeson
+  - base >= 4.7 && < 5
   - bytestring
   - containers
-  - generic-lens
   - deepseq
+  - generic-lens
   - lens
+  - mtl
   - postgresql-query
   - postgresql-simple
   - quickcheck-instances
@@ -28,6 +29,7 @@ dependencies:
   - scientific
   - text
   - time
+  - transformers
   - uuid-types
   - vector
   - vinyl
@@ -93,7 +95,6 @@ tests:
       - tasty-hunit
       - tasty-quickcheck
       - tolstoy
-      - transformers
 
     build-tools:
       - autoexporter

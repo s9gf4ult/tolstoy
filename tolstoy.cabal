@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: da4ce13cb18d5e6da5f98844bfd0e6f3be1cb8be506fac42f8ea785d1f8553aa
+-- hash: 1694959cbbdb93965c9e0a3e69e336c3fa8658990080989a4d79ff726e0ea088
 
 name:           tolstoy
 version:        0.0.1
@@ -54,6 +54,7 @@ library
     , deepseq
     , generic-lens
     , lens
+    , mtl
     , postgresql-query
     , postgresql-simple
     , quickcheck-instances
@@ -61,6 +62,7 @@ library
     , scientific
     , text
     , time
+    , transformers
     , uuid-types
     , vector
     , vinyl
@@ -100,6 +102,7 @@ test-suite tolstoy-test
     , hspec-expectations
     , lens
     , monad-logger
+    , mtl
     , postgresql-query
     , postgresql-simple
     , quickcheck-instances

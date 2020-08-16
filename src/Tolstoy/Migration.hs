@@ -3,6 +3,7 @@ module Tolstoy.Migration where
 import Data.Aeson as J
 import Data.Proxy
 import Data.Typeable
+import Data.UUID.Types
 import GHC.Generics (Generic)
 import GHC.TypeLits
 import Tolstoy.Structure
@@ -29,6 +30,7 @@ data MigrationError
   = AesonError TypeRep String
   | NoMoreVersions TypeRep Integer
   | VersionOutOfBounds Integer
+  | ActionNotFound UUID
   deriving (Eq, Ord, Show, Generic)
 
 type family Last (els :: [*]) where

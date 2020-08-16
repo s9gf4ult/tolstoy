@@ -18,6 +18,7 @@ import qualified Database.PostgreSQL.Simple.FromRow as PG
 import           Database.PostgreSQL.Simple.ToField
 import           GHC.Generics (Generic)
 import           GHC.Stack
+import           Prelude as P
 import           Tolstoy.DB.Types
 import           Tolstoy.Migration
 import           Tolstoy.Structure
@@ -75,7 +76,8 @@ tolstoy docMigrations actMigrations init =
         WHERE document_id = #{documentId}|]
       case res of
         []        -> return Nothing
-        [docDesc] -> return $ Just $ migrateDocDesc docDesc
+        [docDesc] -> return $ Just
+          $ migrateDocDesc docMigrations actMigrations docDesc
         _         -> error "Unexpected count of results"
     getDocHistory documentId = do
       res <- pgQuery [sqlExp|
@@ -86,11 +88,13 @@ tolstoy docMigrations actMigrations init =
         [] -> return Nothing
         [(created, actionId)] -> do
           actions <- pgQuery $ actionsList queries actionId
-          case actionsHistory actId actions of
-            Nothing      -> error "No actions. Unexpected result"
-            Just history -> return $ Just
-              $ DocHistory {documentId, created, history}
-
+          case actionsHistory docMigrations actMigrations actionId actions of
+            Left err    -> return $ Just $ Left err
+            Right slist -> case NE.nonEmpty slist of
+              Nothing      -> return $ Just $ Left
+                $ ActionNotFound $ unActId actionId
+              Just history -> return $ Just $ Right
+                $ DocHistory {documentId, created, history}
     changeDoc docDesc action = case docAction init (docDesc ^. field @"document") action of
       Left e       -> return $ Left e
       Right (newDoc, a) -> do
@@ -102,21 +106,23 @@ tolstoy docMigrations actMigrations init =
             (parent_id, document, document_version, action, action_version)
           VALUES
             ( #{parent}
-            , #{JsonField (toStructValue newDoc)}, #{lastDoc}
-            , #{JsonField (toStructValue action)}, #{lastAct})
+            , #{JsonField (toStructValue newDoc)}, #{docLast}
+            , #{JsonField (toStructValue action)}, #{actLast} )
           RETURNING id, created_at|]
         1 <- pgExecute [sqlExp|UPDATE ^{documentsTable init}
           SET action_id = #{newActId}
           WHERE id = #{docId}|]
         let
           res =  DocDesc
-            { document      = newDoc
-            , documentId    = docId
-            , documentVersion = lastDoc
-            , action      = action
-            , actionId    = newActId
-            , actionVersion = lastAct
-            , created  = docDesc ^. field @"created"
-            , modified = newMod }
+            { document        = newDoc
+            , documentId      = docId
+            , documentVersion = docLast
+            , action          = action
+            , actionId        = newActId
+            , actionVersion   = actLast
+            , created         = docDesc ^. field @"created"
+            , modified        = newMod }
         return $ Right (res, a)
-    listDocuments = pgQuery (queries ^. field @"documentsList")
+    listDocuments = do
+      raw <- pgQuery $ getField @"documentsList" queries
+      return $ traverse (migrateDocDesc docMigrations actMigrations) raw

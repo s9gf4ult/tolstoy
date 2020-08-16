@@ -2,6 +2,7 @@ module Tolstoy.DB.Types where
 
 import           Control.Arrow
 import           Control.Lens
+import           Control.Monad.Except
 import           Control.Monad.Fail
 import           Data.Aeson
 import           Data.Char as C
@@ -119,7 +120,6 @@ migrateDocDesc docMigs actMigs raw = do
     , modified = raw ^. field @"modified"
     }
 
-
 data DocHistory doc act = DocHistory
   { documentId :: DocId doc
   , created    :: UTCTime
@@ -129,21 +129,23 @@ data DocHistory doc act = DocHistory
   } deriving (Eq, Ord, Show, Generic)
 
 data Story doc act = Story
-  { document      :: doc
-  , action        :: act
-  , actionId      :: ActId act
-  , actionVersion :: Integer
-  , modified      :: UTCTime
+  { document        :: doc
+  , documentVersion :: Integer
+  , action          :: act
+  , actionId        :: ActId act
+  , actionVersion   :: Integer
+  , modified        :: UTCTime
+  , parentId        :: Maybe (ActId act)
   } deriving (Eq, Ord, Show, Generic)
 
 data ActionRaw = ActionRaw
-  { actionId         :: UUID
-  , created          :: UTCTime
-  , parentId         :: UUID
-  , document         :: JsonField Value
-  , document_version :: Integer
-  , action           :: JsonField Value
-  , action_version   :: Integer
+  { document        :: JsonField Value
+  , documentVersion :: Integer
+  , action          :: JsonField Value
+  , actionId        :: UUID
+  , actionVersion   :: Integer
+  , modified        :: UTCTime
+  , parentId        :: Maybe UUID
   } deriving (Eq, Show, Generic)
 
 instance FromRow ActionRaw
@@ -155,21 +157,37 @@ actionsHistory
   -> Migrations n2 acts
   -> ActId act
   -> [ActionRaw]
-  -> Maybe (NonEmpty (Story doc act))
-actionsHistory a actions = NE.nonEmpty $ go a
+  -> MigrationResult [Story doc act]
+actionsHistory docMigs actMigs a actions = go $ unActId a
   where
+    go :: UUID -> MigrationResult [Story doc act]
     go actId = case M.lookup actId actMap of
-      Nothing -> []
-      Just h  -> toStory h
-        : (h ^.. field @"parentId" . _Just . to go . traversed)
-    toStory h = Story
-      { document = h ^. field @"document"
-      , action = h ^. field @"action"
-      , actionId = h ^. field @"actionId"
-      , actionVersion = h ^. field @"actionVersion"
-      , modified = h ^. field @"created" }
-    actMap :: M.Map (ActId act) (ActionRow doc act)
-    actMap = M.fromList $ (view (field @"actionId") &&& id) <$> actions
+      Nothing  -> throwError $ ActionNotFound actId
+      Just raw -> do
+        h <- toStory raw
+        rest <- case raw ^. field @"parentId" of
+          Nothing     -> pure []
+          Just parent -> go parent
+        return $ h : rest
+    toStory raw = do
+      document <- migrate
+        (raw ^. field @"documentVersion")
+        (raw ^. field @"document" . to unJsonField)
+        docMigs
+      action <- migrate
+        (raw ^. field @"actionVersion")
+        (raw ^. field @"action" . to unJsonField)
+        actMigs
+      return $ Story
+        { document
+        , documentVersion = raw ^. field @"documentVersion"
+        , action
+        , actionId        = raw ^. field @"actionId" . to ActId
+        , actionVersion   = raw ^. field @"actionVersion"
+        , modified        = raw ^. field @"modified"
+        , parentId        = raw ^? field @"parentId" . _Just . to ActId }
+    actMap :: M.Map UUID ActionRaw
+    actMap = M.fromList $ (getField @"actionId" &&& id) <$> actions
 
 data TolstoyInit doc act a = TolstoyInit
   { docAction       :: !(DocAction doc act a)
@@ -194,7 +212,7 @@ data Tolstoy m doc act a = Tolstoy
   -- ^ Get last version of some object
   , getDocHistory
     :: DocId doc
-    -> m (Maybe (DocHistory doc act))
+    -> m (Maybe (MigrationResult (DocHistory doc act)))
   -- ^ Get full history of the document
   , changeDoc
     :: DocDesc doc act
@@ -202,7 +220,7 @@ data Tolstoy m doc act a = Tolstoy
     -> m (Either Error ((DocDesc doc act), a))
   -- ^ Saves changed doc to the DB. Note that it does not check the
   -- document history consistency right now.
-  , listDocuments :: m [DocDesc doc act]
+  , listDocuments :: m (MigrationResult [DocDesc doc act])
   -- ^ List all docs in DB. Might be not very useful in practice
   , queries :: TolstoyQueries doc act
   } deriving (Generic)
