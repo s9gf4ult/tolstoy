@@ -26,6 +26,7 @@ import Test.Tasty as Test
 import Test.Tasty.HUnit as Test
 import Test.Tasty.QuickCheck
 import Tolstoy.DB
+import Tolstoy.Migration
 import Tolstoy.Structure
 
 newtype Name = Name
@@ -89,6 +90,12 @@ instance Arbitrary UserAction where
 
 instance Structural UserAction
 
+actionMigrations :: Migrations 0 '[ UserAction ]
+actionMigrations = LastVersion Proxy Proxy
+
+userMigrations :: Migrations 0 '[ User ]
+userMigrations = LastVersion Proxy Proxy
+
 userAction :: PureDocAction User UserAction
 userAction = pureDocAction $ \user -> \case
   Init         -> return user
@@ -121,7 +128,7 @@ openDB = do
   p <- createPool (PG.connectPostgreSQL "") PG.close 1 1 1
   let
     tlst :: Testoy
-    tlst = tolstoy $ TolstoyInit
+    tlst = tolstoy userMigrations actionMigrations $ TolstoyInit
       { docAction = userAction
       , documentsTable = "documents"
       , actionsTable = "actions"
@@ -143,14 +150,14 @@ createAndRead :: Testoy -> TestMonad ()
 createAndRead t = do
   let user = User Nothing "wow@such.email" Registered
   desc <- newDoc t user Init
-  let did = desc ^. field @"docId"
+  let did = desc ^. field @"documentId"
   newDesc <- getDoc t did
-  liftIO $ assertEqual "getDoc" (Just desc) newDesc
-  Just hist <- getDocHistory t did
+  liftIO $ assertEqual "getDoc" (Just $ Right desc) newDesc
+  Just (Right hist) <- getDocHistory t did
   let story :| [] = hist ^. field @"history"
-  liftIO $ assertEqual "getHist.doc" (desc ^. field @"doc") (story ^. field @"doc")
-  liftIO $ assertEqual "getHist.act" (desc ^. field @"act") (story ^. field @"act")
-  liftIO $ assertEqual "getHist.actId" (desc ^. field @"actId") (story ^. field @"actId")
+  liftIO $ assertEqual "getHist.doc" (desc ^. field @"document") (story ^. field @"document")
+  liftIO $ assertEqual "getHist.act" (desc ^. field @"action") (story ^. field @"action")
+  liftIO $ assertEqual "getHist.actId" (desc ^. field @"actionId") (story ^. field @"actionId")
 
 listAndChange :: Testoy -> TestMonad ()
 listAndChange t = do
@@ -158,13 +165,13 @@ listAndChange t = do
     users = ["user1", "user2", "user3"] <&> \e ->
       User Nothing e Registered
   insertDescs <- for users $ \u -> newDoc t u Init
-  gotDescs <- listDocuments t
+  Right gotDescs <- listDocuments t
   let
     s1 = S.fromList insertDescs
     s2 = S.fromList gotDescs
   liftIO $ assertEqual "intersect 3" 3 (S.size $ S.intersection s1 s2)
   void $ changeDoc t (P.head insertDescs) Ban
-  newDocs <- listDocuments t
+  Right newDocs <- listDocuments t
   liftIO $ assertEqual "intersect 2" 2
     (S.size $ S.intersection s1 $ S.fromList newDocs)
 
@@ -174,10 +181,10 @@ changeSingleDoc t = do
   let n = "Lupa"
   Right (named, ()) <- changeDoc t userDesc $ SetName n
   liftIO $ assertEqual "Name set" (Just n)
-    $ named ^. field @"doc" . field @"name"
+    $ named ^. field @"document" . field @"name"
   Right (confirmed, ()) <- changeDoc t named Confirm
   liftIO $ assertEqual "Status confirmed" Confirmed
-    $ confirmed ^. field @"doc" . field @"status"
+    $ confirmed ^. field @"document" . field @"status"
 
 pureTests :: TestTree
 pureTests = testGroup "Pure tests"
