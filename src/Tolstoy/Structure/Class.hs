@@ -6,6 +6,7 @@ import           Data.Scientific
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Vector (Vector)
+import qualified Data.Vector as V
 import           GHC.Generics
 import           GHC.TypeLits
 import           Tolstoy.Structure.Kind
@@ -31,11 +32,6 @@ instance Structural Text where
   type StructKind Text = 'StructString
   toStructValue = StringValue
   fromStructValue (StringValue t) = t
-
-instance Structural String where
-  type StructKind String = 'StructString
-  toStructValue = StringValue . T.pack
-  fromStructValue (StringValue t) = T.unpack t
 
 instance Structural Scientific where
   type StructKind Scientific = 'StructNumber
@@ -71,6 +67,11 @@ instance (Structural s) => Structural (Vector s) where
   type StructKind (Vector s) = 'StructVector (StructKind s)
   toStructValue v = VectorValue $ toStructValue <$> v
   fromStructValue (VectorValue v) = fromStructValue <$> v
+
+instance (Structural s) => Structural [s] where
+  type StructKind [s] = 'StructVector (StructKind s)
+  toStructValue l = VectorValue $ toStructValue <$> V.fromList l
+  fromStructValue (VectorValue v) = fromStructValue <$> V.toList v
 
 -- | Generic instance deriving
 instance (Structural a, Structural b) => Structural (Either a b)

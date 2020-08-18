@@ -9,7 +9,7 @@ import Tolstoy.Structure
 data Struct1
   = Struct1Left
     { this :: Int
-    , that :: String }
+    , that :: Text }
   | Struct1Right
     { this :: Int }
   deriving (Eq, Ord, Show, Generic)
@@ -30,7 +30,7 @@ instance Arbitrary Struct2 where
   shrink = genericShrink
 
 data Struct3
-  = Two String
+  = Two Text
   | One Int
   deriving (Eq, Ord, Show, Generic)
 
@@ -42,7 +42,7 @@ instance Arbitrary Struct3 where
 data Complex
   = Complex
   { this :: Int
-  , that :: String }
+  , that :: Text }
   | Simple Int
   | Empty
   | OtherEmpty
@@ -54,7 +54,7 @@ instance Arbitrary Complex where
   shrink = genericShrink
 
 data Broken1 = Broken1
-  { this :: String
+  { this :: Text
   , that :: Int
   } deriving (Eq, Ord, Show, Generic)
 

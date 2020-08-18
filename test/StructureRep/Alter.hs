@@ -20,7 +20,7 @@ instance NFData Struct1
 
 data LeftStruct1 = LeftStruct1
   { this :: Int
-  , that :: String
+  , that :: Text
   } deriving (Eq, Ord, Show, Generic)
 
 instance Structural LeftStruct1
@@ -52,7 +52,7 @@ instance NFData Struct2
 
 data Struct3
   = One Int
-  | Two String
+  | Two Text
   deriving (Eq, Ord, Show, Generic)
 
 instance Structural Struct3
@@ -75,7 +75,7 @@ instance Arbitrary Complex where
 instance NFData Complex
 
 data ComplexCase = ComplexCase
-  { that :: String
+  { that :: Text
   , this :: Int
   } deriving (Eq, Ord, Show, Generic)
 
@@ -86,7 +86,7 @@ instance Arbitrary ComplexCase where
 instance NFData ComplexCase
 
 data Broken1 = Broken1
-  { this :: String
+  { this :: Text
   , that :: Int
   , oups :: Int
   } deriving (Eq, Ord, Show, Generic)

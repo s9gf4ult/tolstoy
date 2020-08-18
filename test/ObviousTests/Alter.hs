@@ -1,17 +1,18 @@
 module ObviousTests.Alter where
 
 import Control.DeepSeq
+import Data.Text as T
 import Data.Vector as V
 import GHC.Generics (Generic)
 import Tolstoy.Structure
 
-data SumB = B String | A Int
+data SumB = B Text | A Int
   deriving (Eq, Ord, Show, Generic)
 instance Structural SumB where
 instance NFData SumB
 
 data Prod2 = Prod2
-  { a :: Maybe String
+  { a :: Maybe Text
   , b :: Vector Int
   , c :: Maybe Int
   } deriving (Eq, Ord, Show, Generic)
@@ -32,10 +33,10 @@ instance Structural Prod4
 instance NFData Prod4
 
 data Prod5 = Prod5
-  { a :: String
+  { a :: Text
   , b :: Int
   , c :: Maybe Int
-  , d :: Maybe String
+  , d :: Maybe Text
   } deriving (Eq, Ord, Show, Generic)
 instance Structural Prod5
 instance NFData Prod5

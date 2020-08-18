@@ -28,7 +28,7 @@ import Tolstoy.Structure
 
 data Rec1 = Rec1
   { a :: Int32
-  , b :: String
+  , b :: Text
   } deriving (Eq, Ord, Show, Generic)
 
 instance Structural Rec1
@@ -38,7 +38,7 @@ instance Arbitrary Rec1 where
 
 data Rec2 = Rec2
   { a :: Int64
-  , b :: String
+  , b :: Text
   } deriving (Eq, Ord, Show, Generic)
 
 instance Structural Rec2
