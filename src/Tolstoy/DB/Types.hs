@@ -67,16 +67,16 @@ data Doctype = Document | Action
 derivePgEnum (fmap C.toLower) ''Doctype
 
 data DocDesc doc act = DocDesc
-  { document        :: doc
-  , documentId      :: DocId doc
-  , documentVersion :: Integer
+  { document        :: !doc
+  , documentId      :: !(DocId doc)
+  , documentVersion :: !Integer
   -- ^ Original version number
-  , action          :: act
-  , actionId        :: ActId act
-  , actionVersion   :: Integer
+  , action          :: !act
+  , actionId        :: !(ActId act)
+  , actionVersion   :: !Integer
   -- ^ Original version number
-  , created         :: UTCTime
-  , modified        :: UTCTime
+  , created         :: !UTCTime
+  , modified        :: !UTCTime
   } deriving (Eq, Ord, Show, Generic)
 
 -- | Convenient type to parse DocDesc from sql
@@ -121,21 +121,21 @@ migrateDocDesc docMigs actMigs raw = do
     }
 
 data DocHistory doc act = DocHistory
-  { documentId :: DocId doc
-  , created    :: UTCTime
-  , history    :: NonEmpty (Story doc act)
+  { documentId :: !(DocId doc)
+  , created    :: !UTCTime
+  , history    :: !(NonEmpty (Story doc act))
   -- ^ Story points in reverse order. Head is the last actual version
   -- and tail is the initial
   } deriving (Eq, Ord, Show, Generic)
 
 data Story doc act = Story
-  { document        :: doc
-  , documentVersion :: Integer
-  , action          :: act
-  , actionId        :: ActId act
-  , actionVersion   :: Integer
-  , modified        :: UTCTime
-  , parentId        :: Maybe (ActId act)
+  { document        :: !doc
+  , documentVersion :: !Integer
+  , action          :: !act
+  , actionId        :: !(ActId act)
+  , actionVersion   :: !Integer
+  , modified        :: !UTCTime
+  , parentId        :: !(Maybe (ActId act))
   } deriving (Eq, Ord, Show, Generic)
 
 data ActionRaw = ActionRaw

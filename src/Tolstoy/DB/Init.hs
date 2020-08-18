@@ -68,7 +68,14 @@ tolstoy docMigrations actMigrations init =
         RETURNING id, created_at|]
       let
         res = DocDesc
-          { document , documentId , action , actionId , created, modified }
+          { document
+          , documentId
+          , documentVersion = docLast
+          , action
+          , actionId
+          , actionVersion = actLast
+          , created
+          , modified }
       return res
     getDoc documentId = do
       res <- pgQuery [sqlExp|
