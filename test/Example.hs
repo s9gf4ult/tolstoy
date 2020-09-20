@@ -118,17 +118,18 @@ runTest :: Pool Connection -> TestMonad a -> IO a
 runTest p t = do
   runStderrLoggingT $ Pool.withResource p $ \con -> runPgMonadT con t
 
-closeDB :: (Testoy, Pool Connection) -> IO ()
-closeDB (tlst, p) = runTest p $ do
-  void $ pgExecute $ tlst ^. field @"queries" . field @"revert"
+closeDB :: (Testoy, TestoyQ, Pool Connection) -> IO ()
+closeDB (tlst, queries, p) = runTest p $ do
+  void $ pgExecute $ queries ^. field @"revert"
 
 -- | All parameters will be taken from env variables by @libpq@
-openDB :: IO (Testoy, Pool Connection)
+openDB :: IO (Testoy, TestoyQ, Pool Connection)
 openDB = do
   p <- createPool (PG.connectPostgreSQL "") PG.close 1 1 1
   let
     tlst :: Testoy
-    tlst = tolstoy userMigrations actionMigrations $ TolstoyInit
+    queries :: TestoyQ
+    (tlst, queries) = tolstoy userMigrations actionMigrations $ TolstoyInit
       { docAction = userAction
       , documentsTable = "documents"
       , actionsTable = "actions"
@@ -136,8 +137,8 @@ openDB = do
       , doctypeTypeName = "doctype"
       }
   void $ runTest p $ do
-    pgExecute $ tlst ^. field @"queries" . field @"deploy"
-  return (tlst, p)
+    pgExecute $ queries ^. field @"deploy"
+  return (tlst, queries, p)
 
 type TestMonad = PgMonadT (LoggingT IO)
 
@@ -146,10 +147,12 @@ instance MonadFail TestMonad where
 
 type Testoy = Tolstoy TestMonad User UserAction ()
 
+type TestoyQ = TolstoyQueries User UserAction
+
 createAndRead :: Testoy -> TestMonad ()
 createAndRead t = do
   let user = User Nothing "wow@such.email" Registered
-  desc <- newDoc t user Init
+  Right desc <- newDoc t user Init
   let did = desc ^. field @"documentId"
   newDesc <- getDoc t did
   liftIO $ assertEqual "getDoc" (Just $ Right desc) newDesc
@@ -164,7 +167,9 @@ listAndChange t = do
   let
     users = ["user1", "user2", "user3"] <&> \e ->
       User Nothing e Registered
-  insertDescs <- for users $ \u -> newDoc t u Init
+  insertDescs <- for users $ \u -> do
+    Right desc <- newDoc t u Init
+    return desc
   Right gotDescs <- listDocuments t
   let
     s1 = S.fromList insertDescs
@@ -177,7 +182,7 @@ listAndChange t = do
 
 changeSingleDoc :: Testoy -> TestMonad ()
 changeSingleDoc t = do
-  userDesc <- newDoc t (User Nothing "Wow@user.com" Registered) Init
+  Right userDesc <- newDoc t (User Nothing "Wow@user.com" Registered) Init
   let n = "Lupa"
   Right (named, ()) <- changeDoc t userDesc $ SetName n
   liftIO $ assertEqual "Name set" (Just n)
@@ -199,7 +204,7 @@ ioTests = Test.withResource openDB closeDB $ \res ->
   let
     exec :: TestName -> (Testoy -> TestMonad ()) -> TestTree
     exec n ma = testCase n $ do
-      (tlst, pool) <- res
+      (tlst, queries, pool) <- res
       runTest pool $ ma tlst
   in testGroup "IO tests"
      [ exec "Create and read" createAndRead
