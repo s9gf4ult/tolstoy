@@ -1,3 +1,4 @@
+-- Returns list of actions recursively. Use "ActionRaw" to parse the result
 WITH RECURSIVE result AS (
   SELECT document, document_version, action, id AS action_id, action_version, created_at AS modified, parent_id
   FROM ^{actions}

@@ -70,11 +70,11 @@ data DocDesc doc act = DocDesc
   { document        :: !doc
   , documentId      :: !(DocId doc)
   , documentVersion :: !Integer
-  -- ^ Original version number
+  -- ^ Original version number before migration
   , action          :: !act
   , actionId        :: !(ActId act)
   , actionVersion   :: !Integer
-  -- ^ Original version number
+  -- ^ Original version number before migration
   , created         :: !UTCTime
   , modified        :: !UTCTime
   } deriving (Eq, Ord, Show, Generic)
@@ -131,9 +131,11 @@ data DocHistory doc act = DocHistory
 data Story doc act = Story
   { document        :: !doc
   , documentVersion :: !Integer
+  -- ^ Original document version number before migration
   , action          :: !act
   , actionId        :: !(ActId act)
   , actionVersion   :: !Integer
+  -- ^ Original action version number before migration
   , modified        :: !UTCTime
   , parentId        :: !(Maybe (ActId act))
   } deriving (Eq, Ord, Show, Generic)

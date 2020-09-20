@@ -47,8 +47,11 @@ lastVersion = \case
 migrate
   :: forall n els
   .  Integer
+  -- ^ Version number of the value
   -> Value
+  -- ^ The value itself
   -> Migrations n els
+  -- ^ Migrations to parse and migrate the value
   -> MigrationResult (Last els)
 migrate n v migrations = case migrations of
   LastVersion pN (_ :: Proxy a) -> if natVal pN == n

@@ -131,5 +131,5 @@ tolstoy docMigrations actMigrations init =
             , modified        = newMod }
         return $ Right (res, a)
     listDocuments = do
-      raw <- pgQuery $ getField @"documentsList" queries
+      raw <- pgQuery $ documentsList queries
       return $ traverse (migrateDocDesc docMigrations actMigrations) raw

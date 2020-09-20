@@ -1,3 +1,4 @@
+-- Use the "DocDescRaw" to parse rows
 SELECT
   act.document as document,
   doc.id as document_id,
