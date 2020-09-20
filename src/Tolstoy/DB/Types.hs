@@ -3,23 +3,19 @@ module Tolstoy.DB.Types where
 import           Control.Arrow
 import           Control.Lens
 import           Control.Monad.Except
-import           Control.Monad.Fail
 import           Data.Aeson
 import           Data.Char as C
 import           Data.Generics.Product
 import           Data.List.NonEmpty as NE
 import qualified Data.Map as M
-import           Data.Pool
 import           Data.Text as T
 import           Data.Time
 import           Data.Typeable
 import           Data.UUID.Types
 import           Database.PostgreSQL.Query as PG
 import           Database.PostgreSQL.Simple.FromField
-import qualified Database.PostgreSQL.Simple.FromRow as PG
 import           Database.PostgreSQL.Simple.ToField
 import           GHC.Generics (Generic)
-import           GHC.Stack
 import           Tolstoy.Migration
 import           Tolstoy.Structure
 
@@ -99,7 +95,7 @@ migrateDocDesc
   => Migrations n1 docs
   -> Migrations n2 acts
   -> DocDescRaw
-  -> MigrationResult (DocDesc doc act)
+  -> TolstoyResult (DocDesc doc act)
 migrateDocDesc docMigs actMigs raw = do
   document <- migrate
     (raw ^. field @"documentVersion")
@@ -159,10 +155,10 @@ actionsHistory
   -> Migrations n2 acts
   -> ActId act
   -> [ActionRaw]
-  -> MigrationResult [Story doc act]
+  -> TolstoyResult [Story doc act]
 actionsHistory docMigs actMigs a actions = go $ unActId a
   where
-    go :: UUID -> MigrationResult [Story doc act]
+    go :: UUID -> TolstoyResult [Story doc act]
     go actId = case M.lookup actId actMap of
       Nothing  -> throwError $ ActionNotFound actId
       Just raw -> do
@@ -206,25 +202,23 @@ data Tolstoy m doc act a = Tolstoy
     -> act
     -- ^ Initial action. It will not be performed on given doc, only
     -- written to DB
-    -> m (DocDesc doc act)
+    -> m (TolstoyResult (DocDesc doc act))
   -- ^ Inserts a new document in DB
   , getDoc
     :: DocId doc
-    -> m (Maybe (MigrationResult (DocDesc doc act)))
+    -> m (Maybe (TolstoyResult (DocDesc doc act)))
   -- ^ Get last version of some object
   , getDocHistory
     :: DocId doc
-    -> m (Maybe (MigrationResult (DocHistory doc act)))
+    -> m (Maybe (TolstoyResult (DocHistory doc act)))
   -- ^ Get full history of the document
   , changeDoc
     :: DocDesc doc act
     -> act
-    -> m (Either Error ((DocDesc doc act), a))
+    -> m (TolstoyResult ((DocDesc doc act), a))
   -- ^ Saves changed doc to the DB. Note that it does not check the
-  -- document history consistency right now.
-  , listDocuments :: m (MigrationResult [DocDesc doc act])
-  -- ^ List all docs in DB. Might be not very useful in practice
-  , queries :: TolstoyQueries doc act
+  -- document history consistency from the business logic perspective
+  , listDocuments :: m (TolstoyResult [DocDesc doc act])
   } deriving (Generic)
 
 data TolstoyQueries doc act = TolstoyQueries

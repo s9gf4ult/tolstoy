@@ -191,14 +191,14 @@ instance
   ) => ObviousProduct ('Product2 l r) ('Product1 n s) ('Just 'R) where
   obviousProduct (Product2Value _ r) = obviousProduct r
 
--- | Adding some optional value is trivial
+-- | Adding some empty optional value is trivial
 instance
   ( 'Nothing ~ (WhereProd p ('Product1 n ('StructOptional s)))
   , KnownSymbol n
   ) => ObviousProduct p ('Product1 n ('StructOptional s)) 'Nothing where
   obviousProduct _ = Product1Value Proxy (OptionalValue Nothing)
 
--- | Adding some vector value is trivial
+-- | Adding some empty vector value is trivial
 instance
   ( 'Nothing ~ (WhereProd p ('Product1 n ('StructVector s)))
   , KnownSymbol n
