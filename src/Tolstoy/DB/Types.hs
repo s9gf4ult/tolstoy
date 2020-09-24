@@ -16,6 +16,7 @@ import           Database.PostgreSQL.Query as PG
 import           Database.PostgreSQL.Simple.FromField
 import           Database.PostgreSQL.Simple.ToField
 import           GHC.Generics (Generic)
+import           Prelude as P
 import           Tolstoy.Migration
 import           Tolstoy.Structure
 
@@ -61,6 +62,14 @@ data Doctype = Document | Action
   deriving (Eq, Ord, Show, Generic)
 
 derivePgEnum (fmap C.toLower) ''Doctype
+
+data VersionRaw = VersionRaw
+  { id            :: !UUID
+  , doctype       :: !Doctype
+  , version       :: !Integer
+  , structure_rep :: !Value
+  , created_at    :: !UTCTime
+  } deriving (Eq, Show, Generic)
 
 data DocDesc doc act = DocDesc
   { document        :: !doc
@@ -185,7 +194,7 @@ actionsHistory docMigs actMigs a actions = go $ unActId a
         , modified        = raw ^. field @"modified"
         , parentId        = raw ^? field @"parentId" . _Just . to ActId }
     actMap :: M.Map UUID ActionRaw
-    actMap = M.fromList $ (getField @"actionId" &&& id) <$> actions
+    actMap = M.fromList $ (getField @"actionId" &&& P.id) <$> actions
 
 data TolstoyInit doc act a = TolstoyInit
   { docAction       :: !(DocAction doc act a)

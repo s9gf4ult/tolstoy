@@ -14,14 +14,18 @@ data Migrations :: Nat -> [*] -> * where
   Migrate
     :: ( Structural a, Structural b
        , KnownNat n, Typeable a
-       , FromJSON (StructureValue (StructKind a)) )
+       , FromJSON (StructureValue (StructKind a))
+       , KnownStructure (StructKind a)
+       )
     => Proxy n
     -> (a -> b)
     -> Migrations (n + 1) (b ': rest)
     -> Migrations n (a ': b ': rest)
   LastVersion
     :: ( KnownNat n, Structural a, Typeable a
-       , FromJSON (StructureValue (StructKind a)) )
+       , FromJSON (StructureValue (StructKind a))
+       , KnownStructure (StructKind a)
+       )
     => Proxy n
     -> Proxy a
     -> Migrations n '[a]
@@ -42,6 +46,22 @@ instance Exception TolstoyError
 type family Last (els :: [*]) where
   Last (a ': b ': rest) = Last (b ': rest)
   Last '[a]             = a
+
+data VersionRep = VersionRep
+  { version  :: !Integer
+  , repValue :: !Value
+  } deriving (Eq, Show, Generic)
+
+versionsRep :: Migrations n els -> [VersionRep]
+versionsRep = \case
+  LastVersion n (_typ :: Proxy typ) -> pure $ VersionRep
+    { version = natVal n
+    , repValue = toJSON (structureRep :: StructureRep (StructKind typ)) }
+  Migrate n (_f :: a -> b) rest -> this : versionsRep rest
+    where
+      this = VersionRep
+        { version = natVal n
+        , repValue = toJSON (structureRep :: StructureRep (StructKind a)) }
 
 lastVersion :: Migrations n els -> Integer
 lastVersion = \case

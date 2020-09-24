@@ -67,11 +67,22 @@ tolstoy
   => Migrations n1 docs
   -> Migrations n2 acts
   -> TolstoyInit doc act a
-  -> (Tolstoy m doc act a, TolstoyQueries doc act)
-tolstoy docMigrations actMigrations init@TolstoyInit{..} =
-  ( Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments }
-  , queries )
+  -> m (Tolstoy m doc act a, TolstoyQueries doc act)
+tolstoy docMigrations actMigrations init@TolstoyInit{..} = do
+  checkDbMigrations
+  return
+    ( Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments }
+    , queries )
   where
+    checkDbMigrations = do
+      dbVersions <- pgQuery [sqlExp|SELECT
+        id,
+        doctype,
+        version,
+        structure_rep,
+        created_at
+        FROM ^{versionsTable}|]
+
     docLast = lastVersion docMigrations
     actLast = lastVersion actMigrations
     queries = initQueries init
