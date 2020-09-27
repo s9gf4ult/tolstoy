@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1694959cbbdb93965c9e0a3e69e336c3fa8658990080989a4d79ff726e0ea088
+-- hash: 1b1f7c85e95025b74da7b23d808433fff9b010e464f4595e4d50e89e67c7b799
 
 name:           tolstoy
 version:        0.0.1
@@ -30,7 +30,6 @@ library
       Test.Tolstoy.Migrations
       Tolstoy.DB
       Tolstoy.DB.Init
-      Tolstoy.DB.Types
       Tolstoy.Migration
       Tolstoy.Migration.Obvious
       Tolstoy.Structure
@@ -38,6 +37,10 @@ library
       Tolstoy.Structure.Kind
       Tolstoy.Structure.Rep
       Tolstoy.Structure.Value
+      Tolstoy.Types
+      Tolstoy.Types.DB
+      Tolstoy.Types.Init
+      Tolstoy.Types.Top
   other-modules:
       Paths_tolstoy
   hs-source-dirs:
@@ -52,6 +55,7 @@ library
     , bytestring
     , containers
     , deepseq
+    , exceptions
     , generic-lens
     , lens
     , mtl
@@ -97,6 +101,7 @@ test-suite tolstoy-test
     , bytestring
     , containers
     , deepseq
+    , exceptions
     , generic-arbitrary
     , generic-lens
     , hspec-expectations

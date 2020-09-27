@@ -28,6 +28,7 @@ dependencies:
   - resource-pool
   - scientific
   - text
+  - exceptions
   - time
   - transformers
   - uuid-types

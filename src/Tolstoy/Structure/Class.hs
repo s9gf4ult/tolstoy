@@ -4,7 +4,6 @@ import           Data.Int
 import           Data.Proxy
 import           Data.Scientific
 import           Data.Text (Text)
-import qualified Data.Text as T
 import           Data.Vector (Vector)
 import qualified Data.Vector as V
 import           GHC.Generics

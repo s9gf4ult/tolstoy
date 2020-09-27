@@ -1,14 +1,13 @@
 module Tolstoy.Migration where
 
-import Control.Exception
 import Data.Aeson as J
 import Data.Proxy
-import Data.Text as T
 import Data.Typeable
-import Data.UUID.Types
 import GHC.Generics (Generic)
 import GHC.TypeLits
+import Prelude as P
 import Tolstoy.Structure
+import Tolstoy.Types
 
 data Migrations :: Nat -> [*] -> * where
   Migrate
@@ -30,26 +29,15 @@ data Migrations :: Nat -> [*] -> * where
     -> Proxy a
     -> Migrations n '[a]
 
-type TolstoyResult = Either TolstoyError
-
-data TolstoyError
-  = AesonError TypeRep String
-  | NoMoreVersions TypeRep Integer
-  | VersionOutOfBounds Integer
-  | ActionNotFound UUID
-  | UserActionError Text        --  FIXME: Custom user error type
-  | DatabaseAssertionFailed (Maybe TypeRep) Text
-  deriving (Eq, Ord, Show, Generic)
-
-instance Exception TolstoyError
 
 type family Last (els :: [*]) where
   Last (a ': b ': rest) = Last (b ': rest)
   Last '[a]             = a
 
-data VersionRep = VersionRep
-  { version  :: !Integer
-  , repValue :: !Value
+
+-- | Versions which must be inserted into the table before operation
+newtype NeedsDeploy = NeedsDeploy
+  { getNeedsDeploy :: [VersionRep]
   } deriving (Eq, Show, Generic)
 
 versionsRep :: Migrations n els -> [VersionRep]
@@ -62,6 +50,22 @@ versionsRep = \case
       this = VersionRep
         { version = natVal n
         , repValue = toJSON (structureRep :: StructureRep (StructKind a)) }
+
+checkVersions
+  :: Migrations n els
+  -- ^ Migrations with versions the app expects
+  -> [VersionRep]
+  -- ^ The versions deployed in the database in ascending order. The
+  -- oldest versions first
+  -> TolstoyResult NeedsDeploy
+checkVersions migs dbVs' = fmap NeedsDeploy $ go dbVs' $ versionsRep migs
+  where
+    go [] []         = return []
+    go dbVs@(_:_) [] = Left $ DatabaseIsNewerThanApp dbVs
+    go [] migVs@(_:_) = return migVs
+    go (dbV:dbRest) (migV:migRest) = if dbV == migV
+      then go dbRest migRest
+      else Left $ DatabaseHasIncompatibleMigration dbV migV
 
 lastVersion :: Migrations n els -> Integer
 lastVersion = \case
@@ -85,7 +89,7 @@ migrate n v migrations = case migrations of
     else Left $ NoMoreVersions (typeRep (Proxy @a)) $ natVal pN
     where
       up :: a -> a
-      up = id
+      up = P.id
   Migrate pN (_ :: a -> b) rest -> case compare n (natVal pN) of
     GT -> migrate n v rest
     EQ -> up <$> aesonResult (fromJSON v)

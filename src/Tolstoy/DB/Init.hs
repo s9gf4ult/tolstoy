@@ -2,26 +2,20 @@ module Tolstoy.DB.Init where
 
 import           Control.Arrow
 import           Control.Lens
+import           Control.Monad
+import           Control.Monad.Catch
 import           Control.Monad.Except
-import           Data.Aeson
 import           Data.Generics.Product
 import           Data.List.NonEmpty as NE
 import qualified Data.Map as M
-import           Data.Pool
-import           Data.Text as T
-import           Data.Time
 import           Data.Typeable
 import           Data.UUID.Types
 import           Database.PostgreSQL.Query as PG
-import           Database.PostgreSQL.Simple.FromField
-import qualified Database.PostgreSQL.Simple.FromRow as PG
-import           Database.PostgreSQL.Simple.ToField
-import           GHC.Generics (Generic)
 import           GHC.Stack
 import           Prelude as P
-import           Tolstoy.DB.Types
 import           Tolstoy.Migration
 import           Tolstoy.Structure
+import           Tolstoy.Types
 
 initQueries :: TolstoyInit doc act a -> TolstoyQueries doc act
 initQueries init = TolstoyQueries { deploy, revert, documentsList, actionsList }
@@ -55,9 +49,107 @@ optionalElement ma = ma >>= \case
     (Just $ typeRep (Proxy @a))
     "Expected 0 or 1 elements but got more"
 
-tolstoy
-  :: forall m doc act a n1 n2 docs acts
+dbToVersionRep :: VersionRaw -> VersionRep
+dbToVersionRep r = VersionRep
+  { version = r ^. field @"version"
+  , repValue = r ^. field @"structure_rep" }
+
+versionToInsert :: Doctype -> VersionRep -> VersionInsert
+versionToInsert doctype r = VersionInsert
+  { doctype
+  , version = r ^. field @"version"
+  , structure_rep = r ^. field @"repValue" }
+
+insertVersions :: NonEmpty VersionInsert -> m ()
+insertVersions = error "FIXME: insertVersions not implemented"
+
+autoDeploy
+  :: (MonadPostgres n, MonadThrow m)
+  => n (TolstoyResult (InitResult m doc act a))
+  -> n (TolstoyResult (Tolstoy m doc act a, TolstoyQueries doc act))
+autoDeploy init = runExceptT $ do
+  res <- ExceptT init
+  case res of
+    InsertBeforeOperation ins -> do
+      lift $ insertVersions ins
+      next <- ExceptT init
+      case next of
+        InsertBeforeOperation wut -> do
+          throwError $ MultipleMigrations wut
+        Ready t q -> return (t, q)
+    Ready t q -> return (t, q)
+
+
+migrateDocDesc
+  :: forall n1 docs n2 acts doc act
+  .  (doc ~ Last docs, act ~ Last acts)
+  => Migrations n1 docs
+  -> Migrations n2 acts
+  -> DocDescRaw
+  -> TolstoyResult (DocDesc doc act)
+migrateDocDesc docMigs actMigs raw = do
+  document <- migrate
+    (raw ^. field @"documentVersion")
+    (unJsonField $ raw ^. field @"document")
+    docMigs
+  action <- migrate
+    (raw ^. field @"actionVersion")
+    (unJsonField $ raw ^. field @"action")
+    actMigs
+  return $ DocDesc
+    { document
+    , documentId = DocId $ raw ^. field @"documentId"
+    , documentVersion = raw ^. field @"documentVersion"
+    , action
+    , actionId = ActId $ raw ^. field @"actionId"
+    , actionVersion = raw ^. field @"actionVersion"
+    , created = raw ^. field @"created"
+    , modified = raw ^. field @"modified"
+    }
+
+actionsHistory
+  :: forall n1 docs n2 acts doc act
+  . (act ~ Last acts, doc ~ Last docs)
+  => Migrations n1 docs
+  -> Migrations n2 acts
+  -> ActId act
+  -> [ActionRaw]
+  -> TolstoyResult [Story doc act]
+actionsHistory docMigs actMigs a actions = go $ unActId a
+  where
+    go :: UUID -> TolstoyResult [Story doc act]
+    go actId = case M.lookup actId actMap of
+      Nothing  -> throwError $ ActionNotFound actId
+      Just raw -> do
+        h <- toStory raw
+        rest <- case raw ^. field @"parentId" of
+          Nothing     -> pure []
+          Just parent -> go parent
+        return $ h : rest
+    toStory raw = do
+      document <- migrate
+        (raw ^. field @"documentVersion")
+        (raw ^. field @"document" . to unJsonField)
+        docMigs
+      action <- migrate
+        (raw ^. field @"actionVersion")
+        (raw ^. field @"action" . to unJsonField)
+        actMigs
+      return $ Story
+        { document
+        , documentVersion = raw ^. field @"documentVersion"
+        , action
+        , actionId        = raw ^. field @"actionId" . to ActId
+        , actionVersion   = raw ^. field @"actionVersion"
+        , modified        = raw ^. field @"modified"
+        , parentId        = raw ^? field @"parentId" . _Just . to ActId }
+    actMap :: M.Map UUID ActionRaw
+    actMap = M.fromList $ (getField @"actionId" &&& P.id) <$> actions
+
+tolstoyInit
+  :: forall m n doc act a n1 n2 docs acts
   .  ( MonadPostgres m
+     , MonadPostgres n
      , StructuralJSON doc, StructuralJSON act
      , HasCallStack
      , Typeable doc, Typeable act
@@ -67,22 +159,36 @@ tolstoy
   => Migrations n1 docs
   -> Migrations n2 acts
   -> TolstoyInit doc act a
-  -> m (Tolstoy m doc act a, TolstoyQueries doc act)
-tolstoy docMigrations actMigrations init@TolstoyInit{..} = do
-  checkDbMigrations
-  return
-    ( Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments }
-    , queries )
+  -> n (TolstoyResult (InitResult m doc act a))
+tolstoyInit docMigrations actMigrations init@TolstoyInit{..} = do
+  dbVersions <- pgQuery [sqlExp|SELECT
+    id,
+    doctype,
+    version,
+    structure_rep,
+    created_at
+    FROM ^{versionsTable}
+    ORDER BY version ASC|]
+  let
+    dbDocVersions = dbVersions ^.. traversed
+      . filtered (views (field @"doctype") (== Document))
+      . to dbToVersionRep
+    dbActVersions = dbVersions ^.. traversed
+      . filtered (views (field @"doctype") (== Action))
+      . to dbToVersionRep
+    checkResult = do
+      NeedsDeploy docReps <- checkVersions docMigrations dbDocVersions
+      NeedsDeploy actReps <- checkVersions actMigrations dbActVersions
+      let
+        inserts = (versionToInsert Document <$> docReps)
+          ++ (versionToInsert Action <$> actReps)
+      return $ case NE.nonEmpty inserts of
+        Nothing -> Ready
+          Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments }
+          queries
+        Just ine -> InsertBeforeOperation ine
+  return checkResult
   where
-    checkDbMigrations = do
-      dbVersions <- pgQuery [sqlExp|SELECT
-        id,
-        doctype,
-        version,
-        structure_rep,
-        created_at
-        FROM ^{versionsTable}|]
-
     docLast = lastVersion docMigrations
     actLast = lastVersion actMigrations
     queries = initQueries init

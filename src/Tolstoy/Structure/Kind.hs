@@ -21,4 +21,4 @@ data ProductTree
   | Product1 Symbol Structure
   | Product2 ProductTree ProductTree
 
-type StructureEmpty = StructProduct Product0
+type StructureEmpty = 'StructProduct 'Product0
