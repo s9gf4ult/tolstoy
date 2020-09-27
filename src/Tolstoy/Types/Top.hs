@@ -8,7 +8,6 @@ import Data.Typeable
 import Data.UUID.Types
 import GHC.Generics (Generic)
 import Tolstoy.Types.DB
-import Tolstoy.Types.Init
 
 type TolstoyResult = Either TolstoyError
 
@@ -28,7 +27,7 @@ instance Exception TolstoyError
 
 data InitResult m doc act a
   = InsertBeforeOperation (NonEmpty VersionInsert)
-  | Ready (Tolstoy m doc act a) (TolstoyQueries doc act)
+  | Ready (Tolstoy m doc act a)
 
 data VersionRep = VersionRep
   { version  :: !Integer

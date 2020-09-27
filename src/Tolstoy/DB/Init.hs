@@ -8,6 +8,7 @@ import           Control.Monad.Except
 import           Data.Generics.Product
 import           Data.List.NonEmpty as NE
 import qualified Data.Map as M
+import qualified Data.Semigroup as Sem
 import           Data.Typeable
 import           Data.UUID.Types
 import           Database.PostgreSQL.Query as PG
@@ -60,25 +61,34 @@ versionToInsert doctype r = VersionInsert
   , version = r ^. field @"version"
   , structure_rep = r ^. field @"repValue" }
 
-insertVersions :: NonEmpty VersionInsert -> m ()
-insertVersions = error "FIXME: insertVersions not implemented"
+insertVersions
+  :: (MonadPostgres m)
+  => FN
+  -> NonEmpty VersionInsert
+  -> m ()
+insertVersions versions vs = void $ pgExecute [sqlExp|
+  INSERT INTO ^{versions} (doctype, "version", structure_rep)
+  VALUES ^{values}|]
+  where
+    values = Sem.sconcat $ NE.intersperse ", " $ toRow <$> vs
+    toRow (VersionInsert d v s) = [sqlExp|(#{d}, #{v}, #{s})|]
 
 autoDeploy
   :: (MonadPostgres n, MonadThrow m)
-  => n (TolstoyResult (InitResult m doc act a))
-  -> n (TolstoyResult (Tolstoy m doc act a, TolstoyQueries doc act))
-autoDeploy init = runExceptT $ do
+  => FN
+  -> n (TolstoyResult (InitResult m doc act a))
+  -> n (TolstoyResult (Tolstoy m doc act a))
+autoDeploy versions init = runExceptT $ do
   res <- ExceptT init
   case res of
     InsertBeforeOperation ins -> do
-      lift $ insertVersions ins
-      next <- ExceptT init
-      case next of
+      lift $ insertVersions versions ins
+      again <- ExceptT init
+      case again of
         InsertBeforeOperation wut -> do
           throwError $ MultipleMigrations wut
-        Ready t q -> return (t, q)
-    Ready t q -> return (t, q)
-
+        Ready t -> return t
+    Ready t -> return t
 
 migrateDocDesc
   :: forall n1 docs n2 acts doc act
@@ -159,8 +169,9 @@ tolstoyInit
   => Migrations n1 docs
   -> Migrations n2 acts
   -> TolstoyInit doc act a
+  -> TolstoyQueries doc act
   -> n (TolstoyResult (InitResult m doc act a))
-tolstoyInit docMigrations actMigrations init@TolstoyInit{..} = do
+tolstoyInit docMigrations actMigrations init@TolstoyInit{..} queries = do
   dbVersions <- pgQuery [sqlExp|SELECT
     id,
     doctype,
@@ -185,13 +196,11 @@ tolstoyInit docMigrations actMigrations init@TolstoyInit{..} = do
       return $ case NE.nonEmpty inserts of
         Nothing -> Ready
           Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments }
-          queries
         Just ine -> InsertBeforeOperation ine
   return checkResult
   where
     docLast = lastVersion docMigrations
     actLast = lastVersion actMigrations
-    queries = initQueries init
     newDoc document action = runExceptT $ do
       (actionId, modified) <- ExceptT $ singleElement $ pgQuery [sqlExp|
         INSERT INTO ^{actionsTable}

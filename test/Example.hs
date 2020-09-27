@@ -4,6 +4,7 @@ module Example where
 
 import Control.Lens
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.Fail
 import Control.Monad.IO.Class
 import Control.Monad.Logger
@@ -28,6 +29,7 @@ import Test.Tasty.QuickCheck
 import Tolstoy.DB
 import Tolstoy.Migration
 import Tolstoy.Structure
+import Tolstoy.Types
 
 newtype Name = Name
   { unName :: Text
@@ -119,7 +121,7 @@ runTest p t = do
   runStderrLoggingT $ Pool.withResource p $ \con -> runPgMonadT con t
 
 closeDB :: (Testoy, TestoyQ, Pool Connection) -> IO ()
-closeDB (tlst, queries, p) = runTest p $ do
+closeDB (_tlst, queries, p) = runTest p $ do
   void $ pgExecute $ queries ^. field @"revert"
 
 -- | All parameters will be taken from env variables by @libpq@
@@ -127,17 +129,21 @@ openDB :: IO (Testoy, TestoyQ, Pool Connection)
 openDB = do
   p <- createPool (PG.connectPostgreSQL "") PG.close 1 1 1
   let
-    tlst :: Testoy
-    queries :: TestoyQ
-    (tlst, queries) = tolstoy userMigrations actionMigrations $ TolstoyInit
+    tinit = TolstoyInit
       { docAction = userAction
       , documentsTable = "documents"
       , actionsTable = "actions"
       , versionsTable = "versions"
       , doctypeTypeName = "doctype"
       }
-  void $ runTest p $ do
-    pgExecute $ queries ^. field @"deploy"
+    queries = initQueries tinit
+    orDrop ma = onException ma $ do
+      void $ pgExecute $ queries ^. field @"revert"
+  tlst <- runTest p $ orDrop $ do
+    void $ pgExecute $ queries ^. field @"deploy"
+    autoDeploy (versionsTable tinit)
+      (tolstoyInit userMigrations actionMigrations tinit queries)
+      >>= either throwM return
   return (tlst, queries, p)
 
 type TestMonad = PgMonadT (LoggingT IO)
@@ -204,7 +210,7 @@ ioTests = Test.withResource openDB closeDB $ \res ->
   let
     exec :: TestName -> (Testoy -> TestMonad ()) -> TestTree
     exec n ma = testCase n $ do
-      (tlst, queries, pool) <- res
+      (tlst, _queries, pool) <- res
       runTest pool $ ma tlst
   in testGroup "IO tests"
      [ exec "Create and read" createAndRead
