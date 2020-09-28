@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1b1f7c85e95025b74da7b23d808433fff9b010e464f4595e4d50e89e67c7b799
+-- hash: dd69ccd3600676b984ac18b70d4f9ee78adec4660b62c46e0060ea581ef66d54
 
 name:           tolstoy
 version:        0.0.1
@@ -76,7 +76,6 @@ test-suite tolstoy-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Example
       ObviousTests
       ObviousTests.Alter
       ObviousTests.Alter2
@@ -86,6 +85,7 @@ test-suite tolstoy-test
       StructureRep.Main
       StructureValue
       TestMigrationsExample
+      UsersExample
       Paths_tolstoy
   hs-source-dirs:
       test

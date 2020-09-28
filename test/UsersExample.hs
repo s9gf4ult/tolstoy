@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module Example where
+module UsersExample where
 
 import Control.Lens
 import Control.Monad
