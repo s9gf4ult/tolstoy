@@ -76,6 +76,7 @@ insertVersions versions vs = void $ pgExecute [sqlExp|
 autoDeploy
   :: (MonadPostgres n, MonadThrow m)
   => FN
+  -- ^ Versions table
   -> n (TolstoyResult (InitResult m doc act a))
   -> n (TolstoyResult (Tolstoy m doc act a))
 autoDeploy versions init = runExceptT $ do

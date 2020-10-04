@@ -31,11 +31,11 @@ import Tolstoy.Migration
 import Tolstoy.Structure
 import Tolstoy.Types
 import UsersExample.Data.V0
+import UsersExample.Shared
 
+type Testoy = Tolstoy TestMonad User UserAction ()
 
-runTest :: Pool Connection -> TestMonad a -> IO a
-runTest p t = do
-  runStderrLoggingT $ Pool.withResource p $ \con -> runPgMonadT con t
+type TestoyQ = TolstoyQueries User UserAction
 
 closeDB :: (Testoy, TestoyQ, Pool Connection) -> IO ()
 closeDB (_tlst, queries, p) = runTest p $ do
@@ -62,15 +62,6 @@ openDB = do
       (tolstoyInit userMigrations actionMigrations tinit queries)
       >>= either throwM return
   return (tlst, queries, p)
-
-type TestMonad = PgMonadT (LoggingT IO)
-
-instance MonadFail TestMonad where
-  fail = error
-
-type Testoy = Tolstoy TestMonad User UserAction ()
-
-type TestoyQ = TolstoyQueries User UserAction
 
 createAndRead :: Testoy -> TestMonad ()
 createAndRead t = do

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 35fc9e025e82b3864d0e4b2c826d48529d358b8fa7b7f57db8dec38f3378bd2b
+-- hash: e66872b303a1fc61f89c19e5a7b3b537e5240b59150a8536f782f47ae3daf6ae
 
 name:           tolstoy
 version:        0.0.1
@@ -89,6 +89,8 @@ test-suite tolstoy-test
       UsersExample.Data.Shared
       UsersExample.Data.V0
       UsersExample.Data.V1
+      UsersExample.MigrationTest
+      UsersExample.Shared
       Paths_tolstoy
   hs-source-dirs:
       test
