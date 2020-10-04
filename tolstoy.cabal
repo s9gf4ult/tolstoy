@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: dd69ccd3600676b984ac18b70d4f9ee78adec4660b62c46e0060ea581ef66d54
+-- hash: 35fc9e025e82b3864d0e4b2c826d48529d358b8fa7b7f57db8dec38f3378bd2b
 
 name:           tolstoy
 version:        0.0.1
@@ -85,7 +85,10 @@ test-suite tolstoy-test
       StructureRep.Main
       StructureValue
       TestMigrationsExample
-      UsersExample
+      UsersExample.CrudTest
+      UsersExample.Data.Shared
+      UsersExample.Data.V0
+      UsersExample.Data.V1
       Paths_tolstoy
   hs-source-dirs:
       test

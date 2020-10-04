@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module UsersExample where
+module UsersExample.CrudTest where
 
 import Control.Lens
 import Control.Monad
@@ -30,91 +30,8 @@ import Tolstoy.DB
 import Tolstoy.Migration
 import Tolstoy.Structure
 import Tolstoy.Types
+import UsersExample.Data.V0
 
-newtype Name = Name
-  { unName :: Text
-  } deriving (Eq, Ord, Show, Generic, Structural, IsString)
-
-instance Arbitrary Name where
-  arbitrary = Arb.elements ["lupa", "pupa", "pepa"]
-
-newtype Email = Email
-  { unEmail :: Text
-  } deriving (Eq, Ord, Show, Generic, Structural, IsString)
-
-instance Arbitrary Email where
-  arbitrary = Arb.elements $ do
-    user <- ["user", "buzer", "muzer"]
-    host <- ["@example.com", "@super.mail", "@google.com"]
-    return $ Email $ user <> host
-
-data User = User
-  { name   :: Maybe Name
-  , email  :: Email
-  , status :: UserStatus
-  } deriving (Eq, Ord, Show, Generic)
-
-instance Structural User
-
-instance Arbitrary User where
-  arbitrary = genericArbitrary
-  shrink = genericShrink
-
-data UserStatus
-  = Registered
-  | Confirmed
-  | Banned
-  deriving (Eq, Ord, Show, Generic)
-
-instance Arbitrary UserStatus where
-  arbitrary = genericArbitrary
-  shrink = genericShrink
-
-instance Structural UserStatus
-
-initUser :: User
-initUser = User
-  { name   = Nothing
-  , email  = "user@email"
-  , status = Registered }
-
-data UserAction
-  = Init
-  | SetName Name
-  | SetEmail Email
-  | Confirm
-  | Ban
-  deriving (Eq, Ord, Show, Generic)
-
-instance Arbitrary UserAction where
-  arbitrary = genericArbitrary
-  shrink = genericShrink
-
-instance Structural UserAction
-
-actionMigrations :: Migrations 0 '[ UserAction ]
-actionMigrations = LastVersion Proxy Proxy
-
-userMigrations :: Migrations 0 '[ User ]
-userMigrations = LastVersion Proxy Proxy
-
-userAction :: PureDocAction User UserAction
-userAction = pureDocAction $ \user -> \case
-  Init         -> return user
-  SetName name -> do
-    checkStatus user
-    return $ user & field @"name" .~ Just name
-  SetEmail e -> do
-    checkStatus user
-    return $ user & field @"email" .~ e
-  Confirm -> do
-    checkStatus user
-    return $ user & field @"status" .~ Confirmed
-  Ban -> return $ user & field @"status" .~ Banned
-  where
-    checkStatus user = case status user of
-      Banned -> Left "User is banned"
-      _      -> pure ()
 
 runTest :: Pool Connection -> TestMonad a -> IO a
 runTest p t = do
