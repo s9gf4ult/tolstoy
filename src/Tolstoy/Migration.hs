@@ -12,15 +12,15 @@ import Tolstoy.Types
 data Migrations :: Nat -> [*] -> * where
   Migrate
     :: ( Structural a, Structural b
-       , KnownNat n, Typeable a
-       , FromJSON (StructureValue (StructKind a))
-       , KnownStructure (StructKind a)
+       , KnownNat (n + 1), Typeable b
+       , FromJSON (StructureValue (StructKind b))
+       , KnownStructure (StructKind b)
        )
-    => Proxy n
+    => Proxy (n + 1)
     -> (a -> b)
-    -> Migrations (n + 1) (b ': rest)
-    -> Migrations n (a ': b ': rest)
-  LastVersion
+    -> Migrations n (a ': rest)
+    -> Migrations (n + 1) (b ': a ': rest)
+  FirstVersion
     :: ( KnownNat n, Structural a, Typeable a
        , FromJSON (StructureValue (StructKind a))
        , KnownStructure (StructKind a)
@@ -29,10 +29,8 @@ data Migrations :: Nat -> [*] -> * where
     -> Proxy a
     -> Migrations n '[a]
 
-
-type family Last (els :: [*]) where
-  Last (a ': b ': rest) = Last (b ': rest)
-  Last '[a]             = a
+type family Head (els :: [*]) where
+  Head (a ': rest) = a
 
 
 -- | Versions which must be inserted into the table before operation
@@ -40,16 +38,20 @@ newtype NeedsDeploy = NeedsDeploy
   { getNeedsDeploy :: [VersionRep]
   } deriving (Eq, Show, Generic)
 
+-- | Returns versions in ascending order
 versionsRep :: Migrations n els -> [VersionRep]
-versionsRep = \case
-  LastVersion n (_typ :: Proxy typ) -> pure $ VersionRep
-    { version = natVal n
-    , repValue = toJSON (structureRep :: StructureRep (StructKind typ)) }
-  Migrate n (_f :: a -> b) rest -> this : versionsRep rest
-    where
-      this = VersionRep
+versionsRep = reverse . go
+  where
+    go :: Migrations n els -> [VersionRep]
+    go = \case
+      FirstVersion n (_typ :: Proxy typ) -> pure $ VersionRep
         { version = natVal n
-        , repValue = toJSON (structureRep :: StructureRep (StructKind a)) }
+        , repValue = toJSON (structureRep :: StructureRep (StructKind typ)) }
+      Migrate n (_f :: a -> b) rest -> this : versionsRep rest
+        where
+          this = VersionRep
+            { version = natVal n
+            , repValue = toJSON (structureRep :: StructureRep (StructKind b)) }
 
 checkVersions
   :: Migrations n els
@@ -67,10 +69,10 @@ checkVersions migs dbVs' = fmap NeedsDeploy $ go dbVs' $ versionsRep migs
       then go dbRest migRest
       else Left $ DatabaseHasIncompatibleMigration dbV migV
 
-lastVersion :: Migrations n els -> Integer
-lastVersion = \case
-  Migrate _ _ rest -> lastVersion rest
-  LastVersion n _  -> natVal n
+actualMigration :: Migrations n els -> Integer
+actualMigration = \case
+  Migrate n _ _ -> natVal n
+  FirstVersion n _ -> natVal n
 
 -- | Finds type the @Value@ should be parsed as, then applies migrations
 -- to it. The result is the last type in the migrations list.
@@ -82,26 +84,21 @@ migrate
   -- ^ The value itself
   -> Migrations n els
   -- ^ Migrations to parse and migrate the value
-  -> TolstoyResult (Last els)
-migrate n v migrations = case migrations of
-  LastVersion pN (_ :: Proxy a) -> if natVal pN == n
-    then up <$> aesonResult (fromJSON v)
-    else Left $ NoMoreVersions (typeRep (Proxy @a)) $ natVal pN
-    where
-      up :: a -> a
-      up = P.id
-  Migrate pN (_ :: a -> b) rest -> case compare n (natVal pN) of
-    GT -> migrate n v rest
-    EQ -> up <$> aesonResult (fromJSON v)
-    LT -> Left $ VersionOutOfBounds $ natVal pN
-    where
-      up :: a -> Last els
-      up a = applyMigrations a migrations
-
-applyMigrations :: a -> Migrations n (a ': rest) -> Last (a ': rest)
-applyMigrations a = \case
-  LastVersion _ _  -> a
-  Migrate _ f rest -> applyMigrations (f a) rest
+  -> TolstoyResult (Head els)
+migrate n v migrations = go P.id migrations
+  where
+    go :: forall goEls goN
+      .  (Head goEls -> Head els)
+      -> Migrations goN goEls
+      -> TolstoyResult (Head els)
+    go lift = \case
+      FirstVersion pN (pA :: Proxy a) -> if natVal pN == n
+        then lift <$> aesonResult (fromJSON v)
+        else Left $ NoMoreVersions (typeRep pA) $ natVal pN
+      Migrate pN (f :: a -> b) rest -> case compare n (natVal pN) of
+        EQ -> lift <$> aesonResult (fromJSON v)
+        LT -> go (lift . f) rest
+        GT -> Left $ VersionOutOfBounds $ natVal pN
 
 aesonResult :: forall a. (Typeable a, Structural a)
   => J.Result (StructureValue (StructKind a))
