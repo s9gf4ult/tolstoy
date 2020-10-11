@@ -13,6 +13,7 @@ import Tolstoy.DB
 import Tolstoy.Migration
 import Tolstoy.Structure
 import Tolstoy.Types
+import TypeFun.Data.Peano
 import UsersExample.Data.Shared
 
 data User = User
@@ -59,11 +60,11 @@ instance Arbitrary UserAction where
 
 instance Structural UserAction
 
-actionMigrations :: Migrations 0 '[ UserAction ]
-actionMigrations = LastVersion Proxy Proxy
+actionMigrations :: Migrations Z '[ UserAction ]
+actionMigrations = FirstVersion Proxy Proxy
 
-userMigrations :: Migrations 0 '[ User ]
-userMigrations = LastVersion Proxy Proxy
+userMigrations :: Migrations Z '[ User ]
+userMigrations = FirstVersion Proxy Proxy
 
 userAction :: PureDocAction User UserAction
 userAction = pureDocAction $ \user -> \case

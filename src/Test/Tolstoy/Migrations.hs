@@ -52,7 +52,8 @@ genMigrationsTests migs checks = case (migs, checks) of
     (name, checkF f)
     : genMigrationsTests rest checkRest
     where
-      name = show (peanoVal n) ++ ": " ++ tn (Proxy @a) ++ " -> " ++ tn (Proxy @b)
+      name = show (peanoVal n) ++ ": " ++ tn (Proxy @a)
+        ++ " -> " ++ tn (Proxy @b)
       tn :: forall x. (Typeable x) => Proxy x -> String
       tn p = tyConName $ typeRepTyCon $ typeRep p
   (FirstVersion _ _, FirstCheck) -> []

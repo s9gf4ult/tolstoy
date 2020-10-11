@@ -5,17 +5,15 @@ import           Control.Monad
 import           Data.Char as C
 import           Data.Generics.Product
 import           Data.Proxy
-import           Data.String
 import           Data.Text as T
 import           GHC.Generics (Generic)
 import           Test.QuickCheck.Arbitrary
 import           Test.QuickCheck.Arbitrary.Generic
-import           Test.QuickCheck.Gen as Arb
-import           Tolstoy.DB
 import           Tolstoy.Migration
 import           Tolstoy.Migration.Obvious
 import           Tolstoy.Structure
 import           Tolstoy.Types
+import           TypeFun.Data.Peano
 import           UsersExample.Data.Shared
 import qualified UsersExample.Data.V0 as V0
 
@@ -70,15 +68,15 @@ instance Arbitrary UserAction where
 instance Structural UserAction
 
 
-actionMigrations :: Migrations 0 '[ V0.UserAction, UserAction ]
+actionMigrations :: Migrations (S Z) '[ UserAction, V0.UserAction ]
 actionMigrations
   = Migrate Proxy obviousMigration
-  $ LastVersion Proxy Proxy
+  $ FirstVersion Proxy Proxy
 
-userMigrations :: Migrations 0 '[ V0.User, User ]
+userMigrations :: Migrations (S Z) '[ User, V0.User]
 userMigrations
   = Migrate Proxy obviousMigration
-  $ LastVersion Proxy Proxy
+  $ FirstVersion Proxy Proxy
 
 userAction :: PureDocAction User UserAction
 userAction = pureDocAction $ \user -> \case

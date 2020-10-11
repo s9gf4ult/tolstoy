@@ -2,29 +2,20 @@ module TestMigrationsExample where
 
 import Control.DeepSeq
 import Control.Lens
-import Control.Monad
-import Data.Aeson as J
 import Data.Generics.Product
 import Data.Int
-import Data.Maybe
-import Data.Scientific
-import Data.String
 import Data.Text as T
 import Data.Typeable
-import Data.Vector as V
 import GHC.Generics (Generic)
-import Test.Hspec.Expectations
 import Test.QuickCheck
-import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Arbitrary.Generic
-import Test.QuickCheck.Gen as Gen
 import Test.QuickCheck.Instances ()
 import Test.Tasty as Test
-import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Test.Tolstoy.Migrations
 import Tolstoy.Migration
 import Tolstoy.Structure
+import TypeFun.Data.Peano
 
 data Rec1 = Rec1
   { a :: Int32
@@ -53,13 +44,13 @@ rec1to2 r = Rec2
   , b = r ^. field @"b"
   }
 
-migrations :: Migrations 0 '[Rec1, Rec2]
+migrations :: Migrations (S Z) '[Rec2, Rec1]
 migrations
   = Migrate Proxy rec1to2
-  $ LastVersion Proxy Proxy
+  $ FirstVersion Proxy Proxy
 
-customChecks :: Checks AnyTypes 0 '[Rec1, Rec2]
-customChecks = Check Proxy rec1Check $ LastCheck
+customChecks :: Checks AnyTypes (S Z) '[Rec2, Rec1]
+customChecks = Check Proxy rec1Check FirstCheck
   where
     rec1Check f = forAll arbitrary $ \rec1 ->
       toInteger (rec1 ^. field @"a") === toInteger (f rec1 ^. field @"a")
