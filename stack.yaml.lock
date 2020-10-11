@@ -11,6 +11,13 @@ packages:
       sha256: 7c1bc5f9beebc839d05b8b12b69e0a89b840e656db9a2f9c859738e358596474
   original:
     hackage: postgresql-query-3.7.0
+- completed:
+    hackage: type-fun-0.1.2@sha256:c08422f9f9b326778d43063bc4dd3069cec336e15082b274953f3800d766b147,1736
+    pantry-tree:
+      size: 583
+      sha256: 1240e7bf2820c06d28a910909d2a6f034ec2fd88ce44822eb418a78ae90825af
+  original:
+    hackage: type-fun-0.1.2
 snapshots:
 - completed:
     size: 498180

@@ -10,3 +10,4 @@ packages:
 
 extra-deps:
   - postgresql-query-3.7.0
+  - type-fun-0.1.2

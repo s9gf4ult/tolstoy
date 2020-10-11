@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e66872b303a1fc61f89c19e5a7b3b537e5240b59150a8536f782f47ae3daf6ae
+-- hash: 63339b3dcdc12ec12477f3571efe6094d972eeca49f3f73a72c9bd64f34c3516
 
 name:           tolstoy
 version:        0.0.1
@@ -67,6 +67,7 @@ library
     , text
     , time
     , transformers
+    , type-fun >=0.1.2
     , uuid-types
     , vector
     , vinyl
@@ -126,6 +127,7 @@ test-suite tolstoy-test
     , time
     , tolstoy
     , transformers
+    , type-fun >=0.1.2
     , uuid-types
     , vector
     , vinyl

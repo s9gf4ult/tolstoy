@@ -19,6 +19,7 @@ dependencies:
   - bytestring
   - containers
   - deepseq
+  - exceptions
   - generic-lens
   - lens
   - mtl
@@ -28,9 +29,9 @@ dependencies:
   - resource-pool
   - scientific
   - text
-  - exceptions
   - time
   - transformers
+  - type-fun >= 0.1.2
   - uuid-types
   - vector
   - vinyl

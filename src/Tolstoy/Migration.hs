@@ -8,20 +8,21 @@ import GHC.TypeLits
 import Prelude as P
 import Tolstoy.Structure
 import Tolstoy.Types
+import TypeFun.Data.Peano
 
-data Migrations :: Nat -> [*] -> * where
+data Migrations :: N -> [*] -> * where
   Migrate
     :: ( Structural a, Structural b
-       , KnownNat (n + 1), Typeable b
+       , Typeable b
        , FromJSON (StructureValue (StructKind b))
        , KnownStructure (StructKind b)
        )
-    => Proxy (n + 1)
+    => Proxy (S n)
     -> (a -> b)
     -> Migrations n (a ': rest)
-    -> Migrations (n + 1) (b ': a ': rest)
+    -> Migrations (S n) (b ': a ': rest)
   FirstVersion
-    :: ( KnownNat n, Structural a, Typeable a
+    :: ( Structural a, Typeable a
        , FromJSON (StructureValue (StructKind a))
        , KnownStructure (StructKind a)
        )
