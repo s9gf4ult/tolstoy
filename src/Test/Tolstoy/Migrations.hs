@@ -3,32 +3,32 @@ module Test.Tolstoy.Migrations where
 import Control.DeepSeq
 import Data.Typeable
 import GHC.Exts
-import GHC.TypeLits
 import Test.QuickCheck
 import Tolstoy.Migration
+import TypeFun.Data.Peano
 
-data Checks :: (* -> * -> Constraint) -> Nat -> [*] -> * where
+data Checks :: (* -> * -> Constraint) -> N -> [*] -> * where
   Check
-    :: ( KnownNat (n + 1), dict a b, Typeable a, Typeable b )
-    => Proxy (n + 1)
+    :: ( KnownPeano ('S n), dict a b, Typeable a, Typeable b )
+    => Proxy ('S n)
     -> ((a -> b) -> Property)
     -- ^ The migration checker
     -> Checks dict n (a ': rest)
-    -> Checks dict (n + 1) (b ': a ': rest)
-  FirstCheck :: (KnownNat n) => Checks dict n '[a]
+    -> Checks dict ('S n) (b ': a ': rest)
+  FirstCheck :: (KnownPeano n) => Checks dict n '[a]
 
 class CheckAll (dict :: * -> * -> Constraint) n els where
   checkAll
     :: (forall a b. (dict a b) => (a -> b) -> Property)
     -> Checks dict n els
 
-instance (KnownNat n) => CheckAll dict n '[a] where
+instance (KnownPeano n) => CheckAll dict n '[a] where
   checkAll _ = FirstCheck
 
 instance
   ( CheckAll dict n (a ': rest)
-  , sN ~ (n + 1)
-  , KnownNat sN
+  , sN ~ ('S n)
+  , KnownPeano sN
   , dict a b
   , Typeable a, Typeable b
   ) => CheckAll dict sN (b ': a ': rest) where
@@ -52,7 +52,7 @@ genMigrationsTests migs checks = case (migs, checks) of
     (name, checkF f)
     : genMigrationsTests rest checkRest
     where
-      name = show (natVal n) ++ ": " ++ tn (Proxy @a) ++ " -> " ++ tn (Proxy @b)
+      name = show (peanoVal n) ++ ": " ++ tn (Proxy @a) ++ " -> " ++ tn (Proxy @b)
       tn :: forall x. (Typeable x) => Proxy x -> String
       tn p = tyConName $ typeRepTyCon $ typeRep p
   (FirstVersion _ _, FirstCheck) -> []

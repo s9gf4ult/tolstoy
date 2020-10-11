@@ -13,7 +13,7 @@ import TypeFun.Data.Peano
 data Migrations :: N -> [*] -> * where
   Migrate
     :: ( Structural a, Structural b
-       , Typeable b
+       , Typeable b, KnownPeano (S n)
        , FromJSON (StructureValue (StructKind b))
        , KnownStructure (StructKind b)
        )
@@ -22,7 +22,7 @@ data Migrations :: N -> [*] -> * where
     -> Migrations n (a ': rest)
     -> Migrations (S n) (b ': a ': rest)
   FirstVersion
-    :: ( Structural a, Typeable a
+    :: ( Structural a, Typeable a, KnownPeano n
        , FromJSON (StructureValue (StructKind a))
        , KnownStructure (StructKind a)
        )
@@ -46,12 +46,12 @@ versionsRep = reverse . go
     go :: Migrations n els -> [VersionRep]
     go = \case
       FirstVersion n (_typ :: Proxy typ) -> pure $ VersionRep
-        { version = natVal n
+        { version = peanoVal n
         , repValue = toJSON (structureRep :: StructureRep (StructKind typ)) }
       Migrate n (_f :: a -> b) rest -> this : versionsRep rest
         where
           this = VersionRep
-            { version = natVal n
+            { version = peanoVal n
             , repValue = toJSON (structureRep :: StructureRep (StructKind b)) }
 
 checkVersions
@@ -72,8 +72,8 @@ checkVersions migs dbVs' = fmap NeedsDeploy $ go dbVs' $ versionsRep migs
 
 actualMigrationIndex :: Migrations n els -> Integer
 actualMigrationIndex = \case
-  Migrate n _ _ -> natVal n
-  FirstVersion n _ -> natVal n
+  Migrate n _ _ -> peanoVal n
+  FirstVersion n _ -> peanoVal n
 
 -- | Finds type the @Value@ should be parsed as, then applies migrations
 -- to it. The result is the last type in the migrations list.
@@ -93,13 +93,13 @@ migrate n v migrations = go P.id migrations
       -> Migrations goN goEls
       -> TolstoyResult (Head els)
     go lift = \case
-      FirstVersion pN (pA :: Proxy a) -> if natVal pN == n
+      FirstVersion pN (pA :: Proxy a) -> if peanoVal pN == n
         then lift <$> aesonResult (fromJSON v)
-        else Left $ NoMoreVersions (typeRep pA) $ natVal pN
-      Migrate pN (f :: a -> b) rest -> case compare n (natVal pN) of
+        else Left $ NoMoreVersions (typeRep pA) $ peanoVal pN
+      Migrate pN (f :: a -> b) rest -> case compare n (peanoVal pN) of
         EQ -> lift <$> aesonResult (fromJSON v)
         LT -> go (lift . f) rest
-        GT -> Left $ VersionOutOfBounds $ natVal pN
+        GT -> Left $ VersionOutOfBounds $ peanoVal pN
 
 aesonResult :: forall a. (Typeable a, Structural a)
   => J.Result (StructureValue (StructKind a))
