@@ -93,7 +93,7 @@ autoDeploy versions init = runExceptT $ do
 
 migrateDocDesc
   :: forall n1 docs n2 acts doc act
-  .  (doc ~ Last docs, act ~ Last acts)
+  .  (doc ~ Head docs, act ~ Head acts)
   => Migrations n1 docs
   -> Migrations n2 acts
   -> DocDescRaw
@@ -120,7 +120,7 @@ migrateDocDesc docMigs actMigs raw = do
 
 actionsHistory
   :: forall n1 docs n2 acts doc act
-  . (act ~ Last acts, doc ~ Last docs)
+  . (act ~ Head acts, doc ~ Head docs)
   => Migrations n1 docs
   -> Migrations n2 acts
   -> ActId act
@@ -164,8 +164,8 @@ tolstoyInit
      , StructuralJSON doc, StructuralJSON act
      , HasCallStack
      , Typeable doc, Typeable act
-     , doc ~ Last docs
-     , act ~ Last acts
+     , doc ~ Head docs
+     , act ~ Head acts
      )
   => Migrations n1 docs
   -> Migrations n2 acts
@@ -200,15 +200,15 @@ tolstoyInit docMigrations actMigrations init@TolstoyInit{..} queries = do
         Just ine -> InsertBeforeOperation ine
   return checkResult
   where
-    docLast = lastVersion docMigrations
-    actLast = lastVersion actMigrations
+    docIndex = actualMigrationIndex docMigrations
+    actIndex = actualMigrationIndex actMigrations
     newDoc document action = runExceptT $ do
       (actionId, modified) <- ExceptT $ singleElement $ pgQuery [sqlExp|
         INSERT INTO ^{actionsTable}
           (document, document_version, action, action_version)
         VALUES
-          ( #{JsonField (toStructValue document)}, #{docLast}
-          , #{JsonField (toStructValue action)}, #{actLast} )
+          ( #{JsonField (toStructValue document)}, #{docIndex}
+          , #{JsonField (toStructValue action)}, #{actIndex} )
         RETURNING id, created_at|]
       (documentId, created) <- ExceptT $ singleElement $ pgQuery [sqlExp|
         INSERT INTO ^{documentsTable} (action_id)
@@ -218,10 +218,10 @@ tolstoyInit docMigrations actMigrations init@TolstoyInit{..} queries = do
         res = DocDesc
           { document
           , documentId
-          , documentVersion = docLast
+          , documentVersion = docIndex
           , action
           , actionId
-          , actionVersion = actLast
+          , actionVersion = actIndex
           , created
           , modified }
       return res
@@ -260,8 +260,8 @@ tolstoyInit docMigrations actMigrations init@TolstoyInit{..} queries = do
             (parent_id, document, document_version, action, action_version)
           VALUES
             ( #{parent}
-            , #{JsonField (toStructValue newDoc)}, #{docLast}
-            , #{JsonField (toStructValue action)}, #{actLast} )
+            , #{JsonField (toStructValue newDoc)}, #{docIndex}
+            , #{JsonField (toStructValue action)}, #{actIndex} )
           RETURNING id, created_at|]
         check <- pgExecute [sqlExp|UPDATE ^{documentsTable}
           SET action_id = #{newActId}
@@ -272,10 +272,10 @@ tolstoyInit docMigrations actMigrations init@TolstoyInit{..} queries = do
           res =  DocDesc
             { document        = newDoc
             , documentId      = docId
-            , documentVersion = docLast
+            , documentVersion = docIndex
             , action          = action
             , actionId        = newActId
-            , actionVersion   = actLast
+            , actionVersion   = actIndex
             , created         = docDesc ^. field @"created"
             , modified        = newMod }
         return (res, a)

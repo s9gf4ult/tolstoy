@@ -69,8 +69,8 @@ checkVersions migs dbVs' = fmap NeedsDeploy $ go dbVs' $ versionsRep migs
       then go dbRest migRest
       else Left $ DatabaseHasIncompatibleMigration dbV migV
 
-actualMigration :: Migrations n els -> Integer
-actualMigration = \case
+actualMigrationIndex :: Migrations n els -> Integer
+actualMigrationIndex = \case
   Migrate n _ _ -> natVal n
   FirstVersion n _ -> natVal n
 
