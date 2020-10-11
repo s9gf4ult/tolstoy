@@ -18,10 +18,10 @@ import           Tolstoy.Migration
 import           Tolstoy.Structure
 import           Tolstoy.Types
 
-initQueries :: TolstoyInit doc act a -> TolstoyQueries doc act
+initQueries :: TolstoyTables -> TolstoyQueries doc act
 initQueries init = TolstoyQueries { deploy, revert, documentsList, actionsList }
   where
-    documents = documentsTable init
+    documents = documentsTable  init
     actions = actionsTable init
     versions = versionsTable init
     doctypeName = doctypeTypeName init
@@ -169,10 +169,11 @@ tolstoyInit
      )
   => Migrations n1 docs
   -> Migrations n2 acts
-  -> TolstoyInit doc act a
+  -> DocAction doc act a
+  -> TolstoyTables
   -> TolstoyQueries doc act
   -> n (TolstoyResult (InitResult m doc act a))
-tolstoyInit docMigrations actMigrations init@TolstoyInit{..} queries = do
+tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries = do
   dbVersions <- pgQuery [sqlExp|SELECT
     id,
     doctype,

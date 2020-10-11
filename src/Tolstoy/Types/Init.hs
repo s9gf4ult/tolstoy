@@ -14,9 +14,8 @@ type PureDocAction doc act = DocAction doc act ()
 pureDocAction :: (doc -> act -> Either Error doc) -> PureDocAction doc act
 pureDocAction f doc act = (,()) <$> f doc act
 
-data TolstoyInit doc act a = TolstoyInit
-  { docAction       :: !(DocAction doc act a)
-  , documentsTable  :: !FN
+data TolstoyTables = TolstoyTables
+  { documentsTable  :: !FN
   , actionsTable    :: !FN
   , versionsTable   :: !FN
   , doctypeTypeName :: !FN

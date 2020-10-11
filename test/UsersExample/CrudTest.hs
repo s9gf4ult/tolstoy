@@ -46,9 +46,8 @@ openDB :: IO (Testoy, TestoyQ, Pool Connection)
 openDB = do
   p <- createPool (PG.connectPostgreSQL "") PG.close 1 1 1
   let
-    tinit = TolstoyInit
-      { docAction = userAction
-      , documentsTable = "documents"
+    tinit = TolstoyTables
+      { documentsTable = "documents"
       , actionsTable = "actions"
       , versionsTable = "versions"
       , doctypeTypeName = "doctype"
@@ -59,7 +58,7 @@ openDB = do
   tlst <- runTest p $ orDrop $ do
     void $ pgExecute $ queries ^. field @"deploy"
     autoDeploy (versionsTable tinit)
-      (tolstoyInit userMigrations actionMigrations tinit queries)
+      (tolstoyInit userMigrations actionMigrations userAction tinit queries)
       >>= either throwM return
   return (tlst, queries, p)
 

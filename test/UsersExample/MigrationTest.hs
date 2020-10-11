@@ -29,23 +29,20 @@ mig0ThenMig1 getPool = do
   p <- getPool
   runTest p $ do
     let
-      tinit = TolstoyInit
-        { docAction = V0.userAction
-        , documentsTable = "documents"
+      tinit = TolstoyTables
+        { documentsTable = "documents"
         , actionsTable = "actions"
         , versionsTable = "versions"
         , doctypeTypeName = "doctype" }
-      tinit1 = tinit { docAction = V1.userAction}
       queries = initQueries tinit
-      queries1 = initQueries tinit1
     void $ pgExecute $ queries ^. field @"deploy"
     tlst0 :: Tolstoy TestMonad V0.User V0.UserAction () <-
       autoDeploy (versionsTable tinit)
-      (tolstoyInit V0.userMigrations V0.actionMigrations tinit queries) >>=
+      (tolstoyInit V0.userMigrations V0.actionMigrations V0.userAction tinit queries) >>=
       either throwM return
     tlst1 :: Tolstoy TestMonad V1.User V1.UserAction () <-
-      autoDeploy (versionsTable tinit1)
-      (tolstoyInit V1.userMigrations V1.actionMigrations tinit1 queries1) >>=
+      autoDeploy (versionsTable tinit)
+      (tolstoyInit V1.userMigrations V1.actionMigrations V1.userAction tinit queries) >>=
       either throwM return
     void $ pgExecute $ queries ^. field @"revert"
 
