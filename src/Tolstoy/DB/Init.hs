@@ -74,7 +74,7 @@ insertVersions versions vs = void $ pgExecute [sqlExp|
     toRow (VersionInsert d v s) = [sqlExp|(#{d}, #{v}, #{s})|]
 
 autoDeploy
-  :: (MonadPostgres n, MonadThrow m)
+  :: (MonadPostgres n)
   => FN
   -- ^ Versions table
   -> n (TolstoyResult (InitResult m doc act a))
@@ -156,6 +156,27 @@ actionsHistory docMigs actMigs a actions = go $ unActId a
         , parentId        = raw ^? field @"parentId" . _Just . to ActId }
     actMap :: M.Map UUID ActionRaw
     actMap = M.fromList $ (getField @"actionId" &&& P.id) <$> actions
+
+
+tolstoyAutoInit
+  :: forall m n doc act a n1 n2 docs acts
+  .  ( MonadPostgres m
+     , MonadPostgres n, MonadThrow n
+     , StructuralJSON doc, StructuralJSON act
+     , HasCallStack
+     , Typeable doc, Typeable act
+     , doc ~ Head docs
+     , act ~ Head acts
+     )
+  => Migrations n1 docs
+  -> Migrations n2 acts
+  -> DocAction doc act a
+  -> TolstoyTables
+  -> n (Tolstoy m doc act a)
+tolstoyAutoInit docMigrations actMigrations docAction tables =
+  autoDeploy (versionsTable tables)
+  (tolstoyInit docMigrations actMigrations docAction tables
+   (initQueries tables)) >>= either throwM return
 
 tolstoyInit
   :: forall m n doc act a n1 n2 docs acts
