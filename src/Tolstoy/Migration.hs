@@ -1,14 +1,16 @@
 module Tolstoy.Migration where
 
-import Data.Aeson as J
-import Data.Proxy
-import Data.Typeable
-import GHC.Generics (Generic)
-import GHC.TypeLits
-import Prelude as P
-import Tolstoy.Structure
-import Tolstoy.Types
-import TypeFun.Data.Peano
+import           Data.Aeson as J
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
+import           Data.Proxy
+import           Data.Typeable
+import           GHC.Generics (Generic)
+import           GHC.TypeLits
+import           Prelude as P
+import           Tolstoy.Structure
+import           Tolstoy.Types
+import           TypeFun.Data.Peano
 
 data Migrations :: N -> [*] -> * where
   Migrate
@@ -33,6 +35,7 @@ data Migrations :: N -> [*] -> * where
 type family Head (els :: [*]) where
   Head (a ': rest) = a
 
+type MigMap a = Map Integer (Value -> TolstoyResult a)
 
 -- | Versions which must be inserted into the table before operation
 newtype NeedsDeploy = NeedsDeploy
@@ -75,18 +78,36 @@ actualMigrationIndex = \case
   Migrate n _ _ -> peanoVal n
   FirstVersion n _ -> peanoVal n
 
+migMap
+  :: forall n els
+  .  Migrations n els
+  -> MigMap (Head els)
+migMap migs = M.fromList $ go P.id migs
+  where
+    go :: forall goEls goN
+      .  (Head goEls -> Head els)
+      -> Migrations goN goEls
+      -> [(Integer, Value -> TolstoyResult (Head els))]
+    go lift = \case
+      FirstVersion pN (pA :: Proxy a) ->
+        [(peanoVal pN, \v -> lift <$> aesonResult (fromJSON v))]
+      Migrate pN (f :: a -> b) rest ->
+        (peanoVal pN, \v -> lift <$> aesonResult (fromJSON v))
+        : go (lift . f) rest
+
 -- | Finds type the @Value@ should be parsed as, then applies migrations
 -- to it. The result is the last type in the migrations list.
 migrate
-  :: forall n els
+  :: forall r
   .  Integer
   -- ^ Version number of the value
   -> Value
   -- ^ The value itself
-  -> Migrations n els
+  -> MigMap r
   -- ^ Migrations to parse and migrate the value
-  -> TolstoyResult (Head els)
-migrate n v migrations = go P.id migrations
+  -> TolstoyResult r
+migrate n v mm = case M.lookup n mm of
+  Nothing ->
   where
     go :: forall goEls goN
       .  (Head goEls -> Head els)
