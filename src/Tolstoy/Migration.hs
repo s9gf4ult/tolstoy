@@ -107,20 +107,8 @@ migrate
   -- ^ Migrations to parse and migrate the value
   -> TolstoyResult r
 migrate n v mm = case M.lookup n mm of
-  Nothing ->
-  where
-    go :: forall goEls goN
-      .  (Head goEls -> Head els)
-      -> Migrations goN goEls
-      -> TolstoyResult (Head els)
-    go lift = \case
-      FirstVersion pN (pA :: Proxy a) -> if peanoVal pN == n
-        then lift <$> aesonResult (fromJSON v)
-        else Left $ NoMoreVersions (typeRep pA) $ peanoVal pN
-      Migrate pN (f :: a -> b) rest -> case compare n (peanoVal pN) of
-        EQ -> lift <$> aesonResult (fromJSON v)
-        LT -> go (lift . f) rest
-        GT -> Left $ VersionOutOfBounds $ peanoVal pN
+  Nothing -> Left $ VersionOutOfBounds n
+  Just f  -> f v
 
 aesonResult :: forall a. (Typeable a, Structural a)
   => J.Result (StructureValue (StructKind a))

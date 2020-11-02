@@ -92,10 +92,8 @@ autoDeploy versions init = runExceptT $ do
     Ready t -> return t
 
 migrateDocDesc
-  :: forall n1 docs n2 acts doc act
-  .  (doc ~ Head docs, act ~ Head acts)
-  => Migrations n1 docs
-  -> Migrations n2 acts
+  :: MigMap doc
+  -> MigMap act
   -> DocDescRaw
   -> TolstoyResult (DocDesc doc act)
 migrateDocDesc docMigs actMigs raw = do
@@ -119,10 +117,9 @@ migrateDocDesc docMigs actMigs raw = do
     }
 
 actionsHistory
-  :: forall n1 docs n2 acts doc act
-  . (act ~ Head acts, doc ~ Head docs)
-  => Migrations n1 docs
-  -> Migrations n2 acts
+  :: forall doc act
+  .  MigMap doc
+  -> MigMap act
   -> ActId act
   -> [ActionRaw]
   -> TolstoyResult [Story doc act]
@@ -222,6 +219,8 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
         Just ine -> InsertBeforeOperation ine
   return checkResult
   where
+    docMigMap = migMap docMigrations
+    actMigMap = migMap actMigrations
     docIndex = actualMigrationIndex docMigrations
     actIndex = actualMigrationIndex actMigrations
     newDoc document action = runExceptT $ do
@@ -252,7 +251,7 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
         SELECT * FROM (^{documentsList queries}) AS docs
         WHERE document_id = #{documentId}|]
       return $ res <&> \descRes ->
-        descRes >>= migrateDocDesc docMigrations actMigrations
+        descRes >>= migrateDocDesc docMigMap actMigMap
     getDocHistory documentId = do
       res <- pgQuery [sqlExp|
         SELECT created_at, action_id
@@ -262,7 +261,7 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
         [] -> return Nothing
         [(created, actionId)] -> do
           actions <- pgQuery $ actionsList queries actionId
-          case actionsHistory docMigrations actMigrations actionId actions of
+          case actionsHistory docMigMap actMigMap actionId actions of
             Left err    -> return $ Just $ Left err
             Right slist -> case NE.nonEmpty slist of
               Nothing      -> return $ Just $ Left
@@ -303,4 +302,4 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
         return (res, a)
     listDocuments = do
       raw <- pgQuery $ documentsList queries
-      return $ traverse (migrateDocDesc docMigrations actMigrations) raw
+      return $ traverse (migrateDocDesc docMigMap actMigMap) raw
