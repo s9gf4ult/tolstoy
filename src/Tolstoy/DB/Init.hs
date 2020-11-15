@@ -30,6 +30,7 @@ initQueries TolstoyTables{..} = TolstoyQueries
   , selectVersions = $(sqlExpFile "selectVersions")
   , insertVersions
   , insertAction
+  , insertDocument = \actionId -> $(sqlExpFile "insertDocument")
   }
   where
     insertVersions vs = [sqlExp|
@@ -222,10 +223,8 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
         , documentVersion = docIndex
         , action
         , actionVersion = actIndex }
-      (documentId, created) <- ExceptT $ singleElement $ pgQuery [sqlExp|
-        INSERT INTO ^{documentsTable} (action_id)
-        VALUES ( #{actionId} )
-        RETURNING id, created_at|]
+      (documentId, created) <- ExceptT $ singleElement $ pgQuery
+        $ insertDocument queries actionId
       let
         res = DocDesc
           { document
