@@ -37,27 +37,30 @@ type Testoy = Tolstoy TestMonad User UserAction ()
 
 type TestoyQ = TolstoyQueries User UserAction
 
+ttables :: TolstoyTables
+ttables = TolstoyTables
+  { documentsTable = "documents"
+  , actionsTable = "actions"
+  , versionsTable = "versions"
+  , doctypeTypeName = "doctype"
+  }
+
 closeDB :: (Testoy, TestoyQ, Pool Connection) -> IO ()
-closeDB (_tlst, queries, p) = runTest p $ do
-  void $ pgExecute $ queries ^. field @"revert"
+closeDB (_tlst, _queries, p) = runTest p $ do
+  void $ pgExecute $ revertQuery ttables
 
 -- | All parameters will be taken from env variables by @libpq@
 openDB :: IO (Testoy, TestoyQ, Pool Connection)
 openDB = do
   p <- createPool (PG.connectPostgreSQL "") PG.close 1 1 1
   let
-    tables = TolstoyTables
-      { documentsTable = "documents"
-      , actionsTable = "actions"
-      , versionsTable = "versions"
-      , doctypeTypeName = "doctype"
-      }
-    queries = initQueries tables
+    queries = initQueries ttables
     orDrop ma = onException ma $ do
-      void $ pgExecute $ queries ^. field @"revert"
+      void $ pgExecute $ revertQuery ttables
   tlst <- runTest p $ orDrop $ do
-    void $ pgExecute $ queries ^. field @"deploy"
-    tolstoyAutoInit userMigrations actionMigrations userAction tables
+    void $ pgExecute $ deployQuery ttables
+    tolstoyAutoInit userMigrations actionMigrations userAction
+      (initQueries ttables)
   return (tlst, queries, p)
 
 createAndRead :: Testoy -> TestMonad ()

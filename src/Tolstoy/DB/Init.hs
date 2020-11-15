@@ -21,9 +21,7 @@ initQueries
   => TolstoyTables
   -> TolstoyQueries doc act
 initQueries TolstoyTables{..} = TolstoyQueries
-  { deploy = $(sqlExpFile "deploy")
-  , revert = $(sqlExpFile "revert")
-  , documentsList
+  { documentsList
   , selectDocument
   , actionsList = \actionId -> $(sqlExpFile "actionsList")
   , selectVersions = $(sqlExpFile "selectVersions")
@@ -48,6 +46,12 @@ initQueries TolstoyTables{..} = TolstoyQueries
       UPDATE ^{documentsTable}
       SET action_id = #{actId}
       WHERE id = #{docId}|]
+
+deployQuery :: TolstoyTables -> SqlBuilder
+deployQuery TolstoyTables{..} = $(sqlExpFile "deploy")
+
+revertQuery :: TolstoyTables -> SqlBuilder
+revertQuery TolstoyTables{..} = $(sqlExpFile "revert")
 
 singleElement
   :: forall a m. (Monad m, Typeable a)

@@ -34,13 +34,14 @@ mig0ThenMig1 getPool = do
         , actionsTable = "actions"
         , versionsTable = "versions"
         , doctypeTypeName = "doctype" }
-      queries = initQueries tables
-    void $ pgExecute $ queries ^. field @"deploy"
+    void $ pgExecute $ deployQuery tables
     tlst0 :: Tolstoy TestMonad V0.User V0.UserAction () <-
-      tolstoyAutoInit V0.userMigrations V0.actionMigrations V0.userAction tables
+      tolstoyAutoInit V0.userMigrations V0.actionMigrations V0.userAction
+      (initQueries tables)
     tlst1 :: Tolstoy TestMonad V1.User V1.UserAction () <-
-      tolstoyAutoInit V1.userMigrations V1.actionMigrations V1.userAction tables
-    void $ pgExecute $ queries ^. field @"revert"
+      tolstoyAutoInit V1.userMigrations V1.actionMigrations V1.userAction
+      (initQueries tables)
+    void $ pgExecute $ revertQuery tables
 
 
 test_Migrations :: TestTree
