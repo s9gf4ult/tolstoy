@@ -18,7 +18,10 @@ import           Tolstoy.Migration
 import           Tolstoy.Structure
 import           Tolstoy.Types
 
-initQueries :: TolstoyTables -> TolstoyQueries doc act
+initQueries
+  :: (Structural doc, Structural act)
+  => TolstoyTables
+  -> TolstoyQueries doc act
 initQueries TolstoyTables{..} = TolstoyQueries
   { deploy = $(sqlExpFile "deploy")
   , revert = $(sqlExpFile "revert")
@@ -26,6 +29,7 @@ initQueries TolstoyTables{..} = TolstoyQueries
   , actionsList = \actionId -> $(sqlExpFile "actionsList")
   , selectVersions = $(sqlExpFile "selectVersions")
   , insertVersions
+  , insertAction
   }
   where
     insertVersions vs = [sqlExp|
@@ -34,6 +38,7 @@ initQueries TolstoyTables{..} = TolstoyQueries
       where
         values = Sem.sconcat $ NE.intersperse ", " $ toRow <$> vs
         toRow (VersionInsert d v s) = [sqlExp|(#{d}, #{v}, #{s})|]
+    insertAction InsertAction{..} = $(sqlExpFile "insertAction")
 
 singleElement
   :: forall a m. (Monad m, Typeable a)
@@ -211,13 +216,12 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
     docIndex = actualMigrationIndex docMigrations
     actIndex = actualMigrationIndex actMigrations
     newDoc document action = runExceptT $ do
-      (actionId, modified) <- ExceptT $ singleElement $ pgQuery [sqlExp|
-        INSERT INTO ^{actionsTable}
-          (document, document_version, action, action_version)
-        VALUES
-          ( #{JsonField (toStructValue document)}, #{docIndex}
-          , #{JsonField (toStructValue action)}, #{actIndex} )
-        RETURNING id, created_at|]
+      (actionId, modified) <- ExceptT $ singleElement $ pgQuery
+        $ insertAction queries $ InsertAction
+        { document
+        , documentVersion = docIndex
+        , action
+        , actionVersion = actIndex }
       (documentId, created) <- ExceptT $ singleElement $ pgQuery [sqlExp|
         INSERT INTO ^{documentsTable} (action_id)
         VALUES ( #{actionId} )

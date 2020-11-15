@@ -33,4 +33,5 @@ data TolstoyQueries doc act = TolstoyQueries
   -- ^ Get action id to get started from
   , selectVersions :: SqlBuilder
   , insertVersions :: NonEmpty VersionInsert -> SqlBuilder
+  , insertAction   :: InsertAction doc act -> SqlBuilder
   } deriving (Generic)
