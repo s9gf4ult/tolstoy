@@ -1,5 +1,6 @@
 module Tolstoy.Types.Init where
 
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Text as T
 import Database.PostgreSQL.Query
 import GHC.Generics (Generic)
@@ -31,4 +32,5 @@ data TolstoyQueries doc act = TolstoyQueries
   , actionsList    :: ActId act -> SqlBuilder
   -- ^ Get action id to get started from
   , selectVersions :: SqlBuilder
+  , insertVersions :: NonEmpty VersionInsert -> SqlBuilder
   } deriving (Generic)

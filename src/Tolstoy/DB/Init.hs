@@ -25,7 +25,15 @@ initQueries TolstoyTables{..} = TolstoyQueries
   , documentsList = $(sqlExpFile "documentsList")
   , actionsList = \actionId -> $(sqlExpFile "actionsList")
   , selectVersions = $(sqlExpFile "selectVersions")
+  , insertVersions
   }
+  where
+    insertVersions vs = [sqlExp|
+      INSERT INTO ^{versionsTable} (doctype, "version", structure_rep)
+      VALUES ^{values}|]
+      where
+        values = Sem.sconcat $ NE.intersperse ", " $ toRow <$> vs
+        toRow (VersionInsert d v s) = [sqlExp|(#{d}, #{v}, #{s})|]
 
 singleElement
   :: forall a m. (Monad m, Typeable a)
@@ -58,29 +66,16 @@ versionToInsert doctype r = VersionInsert
   , version = r ^. field @"version"
   , structure_rep = r ^. field @"repValue" }
 
-insertVersions
-  :: (MonadPostgres m)
-  => FN
-  -> NonEmpty VersionInsert
-  -> m ()
-insertVersions versions vs = void $ pgExecute [sqlExp|
-  INSERT INTO ^{versions} (doctype, "version", structure_rep)
-  VALUES ^{values}|]
-  where
-    values = Sem.sconcat $ NE.intersperse ", " $ toRow <$> vs
-    toRow (VersionInsert d v s) = [sqlExp|(#{d}, #{v}, #{s})|]
-
 autoDeploy
   :: (MonadPostgres n)
-  => FN
-  -- ^ Versions table
+  => TolstoyQueries doc act
   -> n (TolstoyResult (InitResult m doc act a))
   -> n (TolstoyResult (Tolstoy m doc act a))
-autoDeploy versions init = runExceptT $ do
+autoDeploy queries init = runExceptT $ do
   res <- ExceptT init
   case res of
     InsertBeforeOperation ins -> do
-      lift $ insertVersions versions ins
+      lift $ pgExecute $ insertVersions queries ins
       again <- ExceptT init
       case again of
         InsertBeforeOperation wut -> do
@@ -167,10 +162,12 @@ tolstoyAutoInit
   -> DocAction doc act a
   -> TolstoyTables
   -> n (Tolstoy m doc act a)
-tolstoyAutoInit docMigrations actMigrations docAction tables =
-  autoDeploy (versionsTable tables)
-  (tolstoyInit docMigrations actMigrations docAction tables
-   (initQueries tables)) >>= either throwM return
+tolstoyAutoInit docMigrations actMigrations docAction tables = do
+  autoDeploy queries
+    (tolstoyInit docMigrations actMigrations docAction tables queries)
+    >>= either throwM return
+  where
+    queries = initQueries tables
 
 tolstoyInit
   :: forall m n doc act a n1 n2 docs acts
