@@ -30,6 +30,7 @@ initQueries TolstoyTables{..} = TolstoyQueries
   , insertVersions
   , insertAction
   , insertDocument = \actionId -> $(sqlExpFile "insertDocument")
+  , setActionId
   }
   where
     documentsList = $(sqlExpFile "documentsList")
@@ -43,6 +44,10 @@ initQueries TolstoyTables{..} = TolstoyQueries
         values = Sem.sconcat $ NE.intersperse ", "
           $ vs <&> \(VersionInsert d v s) -> [sqlExp|(#{d}, #{v}, #{s})|]
     insertAction InsertAction{..} = $(sqlExpFile "insertAction")
+    setActionId docId actId = [sqlExp|
+      UPDATE ^{documentsTable}
+      SET action_id = #{actId}
+      WHERE id = #{docId}|]
 
 singleElement
   :: forall a m. (Monad m, Typeable a)
@@ -277,9 +282,7 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
           , documentVersion = docIndex
           , action
           , actionVersion = actIndex }
-        check <- pgExecute [sqlExp|UPDATE ^{documentsTable}
-          SET action_id = #{newActId}
-          WHERE id = #{docId}|]
+        check <- pgExecute $ setActionId queries docId newActId
         unless (check == 1) $ throwError $ DatabaseAssertionFailed Nothing
           "Document was not updated"
         let
