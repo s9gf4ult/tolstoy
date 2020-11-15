@@ -19,16 +19,13 @@ import           Tolstoy.Structure
 import           Tolstoy.Types
 
 initQueries :: TolstoyTables -> TolstoyQueries doc act
-initQueries init = TolstoyQueries { deploy, revert, documentsList, actionsList }
-  where
-    documents = documentsTable  init
-    actions = actionsTable init
-    versions = versionsTable init
-    doctypeName = doctypeTypeName init
-    documentsList = $(sqlExpFile "documentsList")
-    deploy = $(sqlExpFile "deploy")
-    revert = $(sqlExpFile "revert")
-    actionsList actionId = $(sqlExpFile "actionsList")
+initQueries TolstoyTables{..} = TolstoyQueries
+  { deploy = $(sqlExpFile "deploy")
+  , revert = $(sqlExpFile "revert")
+  , documentsList = $(sqlExpFile "documentsList")
+  , actionsList = \actionId -> $(sqlExpFile "actionsList")
+  , selectVersions = $(sqlExpFile "selectVersions")
+  }
 
 singleElement
   :: forall a m. (Monad m, Typeable a)
@@ -192,14 +189,7 @@ tolstoyInit
   -> TolstoyQueries doc act
   -> n (TolstoyResult (InitResult m doc act a))
 tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries = do
-  dbVersions <- pgQuery [sqlExp|SELECT
-    id,
-    doctype,
-    version,
-    structure_rep,
-    created_at
-    FROM ^{versionsTable}
-    ORDER BY version ASC|]
+  dbVersions <- pgQuery $ selectVersions queries
   let
     dbDocVersions = dbVersions ^.. traversed
       . filtered (views (field @"doctype") (== Document))

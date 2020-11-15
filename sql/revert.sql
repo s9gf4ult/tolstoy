@@ -1,7 +1,7 @@
-DROP TABLE ^{documents} ;
+DROP TABLE ^{documentsTable} ;
 
-DROP TABLE ^{actions} ;
+DROP TABLE ^{actionsTable} ;
 
-DROP TABLE ^{versions} ;
+DROP TABLE ^{versionsTable} ;
 
-DROP TYPE ^{doctypeName} ;
+DROP TYPE ^{doctypeTypeName} ;

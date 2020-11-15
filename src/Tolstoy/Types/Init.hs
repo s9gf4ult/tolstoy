@@ -22,12 +22,13 @@ data TolstoyTables = TolstoyTables
   } deriving (Generic)
 
 data TolstoyQueries doc act = TolstoyQueries
-  { deploy        :: SqlBuilder
+  { deploy         :: SqlBuilder
   -- ^ Deploy tables to the database
-  , revert        :: SqlBuilder
+  , revert         :: SqlBuilder
   -- ^ Revert tables (drop em)
-  , documentsList :: SqlBuilder
+  , documentsList  :: SqlBuilder
   -- ^ List of latest versions of documents
-  , actionsList   :: ActId act -> SqlBuilder
+  , actionsList    :: ActId act -> SqlBuilder
   -- ^ Get action id to get started from
+  , selectVersions :: SqlBuilder
   } deriving (Generic)
