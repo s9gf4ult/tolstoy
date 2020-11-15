@@ -1,6 +1,5 @@
 module Tolstoy.DB.Init where
 
-import           Control.Arrow
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Catch
@@ -10,7 +9,6 @@ import           Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Semigroup as Sem
 import           Data.Typeable
-import           Data.UUID.Types
 import           Database.PostgreSQL.Query as PG
 import           GHC.Stack
 import           Prelude as P
@@ -25,7 +23,8 @@ initQueries
 initQueries TolstoyTables{..} = TolstoyQueries
   { deploy = $(sqlExpFile "deploy")
   , revert = $(sqlExpFile "revert")
-  , documentsList = $(sqlExpFile "documentsList")
+  , documentsList
+  , selectDocument
   , actionsList = \actionId -> $(sqlExpFile "actionsList")
   , selectVersions = $(sqlExpFile "selectVersions")
   , insertVersions
@@ -33,12 +32,16 @@ initQueries TolstoyTables{..} = TolstoyQueries
   , insertDocument = \actionId -> $(sqlExpFile "insertDocument")
   }
   where
+    documentsList = $(sqlExpFile "documentsList")
+    selectDocument docId = [sqlExp|
+      SELECT * FROM (^{documentsList}) AS docs
+      WHERE document_id = #{docId}|]
     insertVersions vs = [sqlExp|
       INSERT INTO ^{versionsTable} (doctype, "version", structure_rep)
       VALUES ^{values}|]
       where
-        values = Sem.sconcat $ NE.intersperse ", " $ toRow <$> vs
-        toRow (VersionInsert d v s) = [sqlExp|(#{d}, #{v}, #{s})|]
+        values = Sem.sconcat $ NE.intersperse ", "
+          $ vs <&> \(VersionInsert d v s) -> [sqlExp|(#{d}, #{v}, #{s})|]
     insertAction InsertAction{..} = $(sqlExpFile "insertAction")
 
 singleElement
@@ -92,7 +95,7 @@ autoDeploy queries init = runExceptT $ do
 migrateDocDesc
   :: MigMap doc
   -> MigMap act
-  -> DocumentsListRow
+  -> DocumentsListRow doc act
   -> TolstoyResult (DocDesc doc act)
 migrateDocDesc docMigs actMigs raw = do
   document <- migrate
@@ -105,10 +108,10 @@ migrateDocDesc docMigs actMigs raw = do
     actMigs
   return $ DocDesc
     { document
-    , documentId = DocId $ raw ^. field @"documentId"
+    , documentId = raw ^. field @"documentId"
     , documentVersion = raw ^. field @"documentVersion"
     , action
-    , actionId = ActId $ raw ^. field @"actionId"
+    , actionId = raw ^. field @"actionId"
     , actionVersion = raw ^. field @"actionVersion"
     , created = raw ^. field @"created"
     , modified = raw ^. field @"modified"
@@ -119,13 +122,13 @@ actionsHistory
   .  MigMap doc
   -> MigMap act
   -> ActId act
-  -> [ActionsListRow]
+  -> [ActionsListRow act]
   -> TolstoyResult [Story doc act]
-actionsHistory docMigs actMigs a actions = go $ unActId a
+actionsHistory docMigs actMigs a actions = go a
   where
-    go :: UUID -> TolstoyResult [Story doc act]
+    go :: ActId act -> TolstoyResult [Story doc act]
     go actId = case M.lookup actId actMap of
-      Nothing  -> throwError $ ActionNotFound actId
+      Nothing  -> throwError $ ActionNotFound $ unActId actId
       Just raw -> do
         h <- toStory raw
         rest <- case raw ^. field @"parentId" of
@@ -145,13 +148,13 @@ actionsHistory docMigs actMigs a actions = go $ unActId a
         { document
         , documentVersion = raw ^. field @"documentVersion"
         , action
-        , actionId        = raw ^. field @"actionId" . to ActId
+        , actionId        = raw ^. field @"actionId"
         , actionVersion   = raw ^. field @"actionVersion"
         , modified        = raw ^. field @"modified"
-        , parentId        = raw ^? field @"parentId" . _Just . to ActId }
-    actMap :: M.Map UUID ActionsListRow
-    actMap = M.fromList $ (getField @"actionId" &&& P.id) <$> actions
-
+        , parentId        = raw ^. field @"parentId" }
+    actMap :: M.Map (ActId act) (ActionsListRow act)
+    actMap = M.fromList $ actions <&> \a ->
+      (a ^. field @"actionId", a)
 
 tolstoyAutoInit
   :: forall m n doc act a n1 n2 docs acts
@@ -237,27 +240,27 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
           , modified }
       return res
     getDoc documentId = do
-      res <- optionalElement $ pgQuery [sqlExp|
-        SELECT * FROM (^{documentsList queries}) AS docs
-        WHERE document_id = #{documentId}|]
+      res <- optionalElement $ pgQuery
+        $ selectDocument queries documentId
       return $ res <&> \descRes ->
         descRes >>= migrateDocDesc docMigMap actMigMap
     getDocHistory documentId = do
-      res <- pgQuery [sqlExp|
-        SELECT created_at, action_id
-        FROM ^{documentsTable}
-        WHERE id = #{documentId}|]
+      res <- pgQuery $ selectDocument queries documentId
       case res of
         [] -> return Nothing
-        [(created, actionId)] -> do
-          actions <- pgQuery $ actionsList queries actionId
-          case actionsHistory docMigMap actMigMap actionId actions of
+        [docRow :: DocumentsListRow doc act] -> do
+          let actId = docRow ^. field @"actionId"
+          actions <- pgQuery $ actionsList queries actId
+          case actionsHistory docMigMap actMigMap actId actions of
             Left err    -> return $ Just $ Left err
             Right slist -> case NE.nonEmpty slist of
               Nothing      -> return $ Just $ Left
-                $ ActionNotFound $ unActId actionId
+                $ ActionNotFound $ unActId actId
               Just history -> return $ Just $ Right
-                $ DocHistory {documentId, created, history}
+                $ DocHistory
+                { documentId = docRow ^. field @"documentId"
+                , created = docRow ^. field @"created"
+                , history }
         _ -> return $ Just $ Left $ DatabaseAssertionFailed Nothing
           "Got multiple domutents by id"
     changeDoc docDesc action = case docAction (docDesc ^. field @"document") action of

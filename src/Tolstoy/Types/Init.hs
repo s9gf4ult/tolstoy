@@ -28,7 +28,11 @@ data TolstoyQueries doc act = TolstoyQueries
   , revert         :: SqlBuilder
   -- ^ Revert tables (drop em)
   , documentsList  :: SqlBuilder
-  -- ^ List of latest versions of documents
+  -- ^ List of latest versions of documents. Response must be parsed
+  -- as DocumentsListRaw
+  , selectDocument :: DocId doc -> SqlBuilder
+  -- ^ Selects single document. Response must be parsed as
+  -- DocumentsListRaw
   , actionsList    :: ActId act -> SqlBuilder
   -- ^ Get action id to get started from
   , selectVersions :: SqlBuilder
