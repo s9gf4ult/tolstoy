@@ -174,14 +174,12 @@ tolstoyAutoInit
   => Migrations n1 docs
   -> Migrations n2 acts
   -> DocAction doc act a
-  -> TolstoyTables
+  -> TolstoyQueries doc act
   -> n (Tolstoy m doc act a)
-tolstoyAutoInit docMigrations actMigrations docAction tables = do
+tolstoyAutoInit docMigrations actMigrations docAction queries = do
   autoDeploy queries
-    (tolstoyInit docMigrations actMigrations docAction tables queries)
+    (tolstoyInit docMigrations actMigrations docAction queries)
     >>= either throwM return
-  where
-    queries = initQueries tables
 
 tolstoyInit
   :: forall m n doc act a n1 n2 docs acts
@@ -196,10 +194,9 @@ tolstoyInit
   => Migrations n1 docs
   -> Migrations n2 acts
   -> DocAction doc act a
-  -> TolstoyTables
   -> TolstoyQueries doc act
   -> n (TolstoyResult (InitResult m doc act a))
-tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries = do
+tolstoyInit docMigrations actMigrations docAction queries = do
   dbVersions <- pgQuery $ selectVersions queries
   let
     dbDocVersions = dbVersions ^.. traversed
