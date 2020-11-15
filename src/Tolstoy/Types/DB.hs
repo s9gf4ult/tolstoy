@@ -65,10 +65,11 @@ data VersionInsert = VersionInsert
   } deriving (Eq, Show, Generic)
 
 data InsertAction doc act = InsertAction
-  { document        :: doc
-  , documentVersion :: Integer
-  , action          :: act
-  , actionVersion   :: Integer
+  { parentId        :: !(Maybe (ActId act))
+  , document        :: !doc
+  , documentVersion :: !Integer
+  , action          :: !act
+  , actionVersion   :: !Integer
   } deriving (Eq, Ord, Show, Generic)
 
 data DocDesc doc act = DocDesc

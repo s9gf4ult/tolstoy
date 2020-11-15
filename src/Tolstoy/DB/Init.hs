@@ -222,7 +222,8 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
     newDoc document action = runExceptT $ do
       (actionId, modified) <- ExceptT $ singleElement $ pgQuery
         $ insertAction queries $ InsertAction
-        { document
+        { parentId = Nothing
+        , document
         , documentVersion = docIndex
         , action
         , actionVersion = actIndex }
@@ -269,14 +270,13 @@ tolstoyInit docMigrations actMigrations docAction init@TolstoyTables{..} queries
         let
           parent = docDesc ^. field @"actionId"
           docId = docDesc ^. field @"documentId"
-        (newActId, newMod) <- ExceptT $ singleElement $ pgQuery [sqlExp|
-          INSERT INTO ^{actionsTable}
-            (parent_id, document, document_version, action, action_version)
-          VALUES
-            ( #{parent}
-            , #{JsonField (toStructValue newDoc)}, #{docIndex}
-            , #{JsonField (toStructValue action)}, #{actIndex} )
-          RETURNING id, created_at|]
+        (newActId, newMod) <- ExceptT $ singleElement $ pgQuery
+          $ insertAction queries $ InsertAction
+          { parentId = Just parent
+          , document = newDoc
+          , documentVersion = docIndex
+          , action
+          , actionVersion = actIndex }
         check <- pgExecute [sqlExp|UPDATE ^{documentsTable}
           SET action_id = #{newActId}
           WHERE id = #{docId}|]

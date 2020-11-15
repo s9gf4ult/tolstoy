@@ -1,6 +1,7 @@
 INSERT INTO ^{actionsTable}
-  (document, document_version, action, action_version)
+  (parent_id, document, document_version, action, action_version)
 VALUES
-  ( #{JsonField (toStructValue document)}, #{documentVersion}
+  ( #{parentId}
+  , #{JsonField (toStructValue document)}, #{documentVersion}
   , #{JsonField (toStructValue action)}, #{actionVersion} )
 RETURNING id, created_at
