@@ -92,7 +92,7 @@ autoDeploy queries init = runExceptT $ do
 migrateDocDesc
   :: MigMap doc
   -> MigMap act
-  -> DocDescRaw
+  -> DocumentsListRow
   -> TolstoyResult (DocDesc doc act)
 migrateDocDesc docMigs actMigs raw = do
   document <- migrate
@@ -119,7 +119,7 @@ actionsHistory
   .  MigMap doc
   -> MigMap act
   -> ActId act
-  -> [ActionRaw]
+  -> [ActionsListRow]
   -> TolstoyResult [Story doc act]
 actionsHistory docMigs actMigs a actions = go $ unActId a
   where
@@ -149,7 +149,7 @@ actionsHistory docMigs actMigs a actions = go $ unActId a
         , actionVersion   = raw ^. field @"actionVersion"
         , modified        = raw ^. field @"modified"
         , parentId        = raw ^? field @"parentId" . _Just . to ActId }
-    actMap :: M.Map UUID ActionRaw
+    actMap :: M.Map UUID ActionsListRow
     actMap = M.fromList $ (getField @"actionId" &&& P.id) <$> actions
 
 

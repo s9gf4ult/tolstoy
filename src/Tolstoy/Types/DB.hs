@@ -85,7 +85,7 @@ data DocDesc doc act = DocDesc
   } deriving (Eq, Ord, Show, Generic)
 
 -- | Convenient type to parse DocDesc from sql
-data DocDescRaw = DocDescRaw
+data DocumentsListRow = DocumentsListRow
   { document        :: JsonField Value
   , documentId      :: UUID
   , documentVersion :: Integer
@@ -96,7 +96,7 @@ data DocDescRaw = DocDescRaw
   , modified        :: UTCTime
   } deriving (Eq, Show, Generic)
 
-instance FromRow DocDescRaw
+instance FromRow DocumentsListRow
 
 data DocHistory doc act = DocHistory
   { documentId :: !(DocId doc)
@@ -118,7 +118,7 @@ data Story doc act = Story
   , parentId        :: !(Maybe (ActId act))
   } deriving (Eq, Ord, Show, Generic)
 
-data ActionRaw = ActionRaw
+data ActionsListRow = ActionsListRow
   { document        :: JsonField Value
   , documentVersion :: Integer
   , action          :: JsonField Value
@@ -128,4 +128,4 @@ data ActionRaw = ActionRaw
   , parentId        :: Maybe UUID
   } deriving (Eq, Show, Generic)
 
-instance FromRow ActionRaw
+instance FromRow ActionsListRow
