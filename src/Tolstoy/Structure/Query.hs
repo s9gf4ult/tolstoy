@@ -57,11 +57,11 @@ data StructureCondition :: Structure -> * where
     -> StructureCondition s
   StringCondition
     :: StructureJsonValue s 'StringType
-    -> StringOperator
+    -> StringChecker
     -> StructureCondition s
   NumberCondition
     :: StructureJsonValue s 'NumberType
-    -> NumberOperator
+    -> NumberChecker
     -> StructureCondition s
   BoolEqCondition
     :: StructureJsonValue s 'BooleanType
@@ -70,6 +70,9 @@ data StructureCondition :: Structure -> * where
 
 data StructureJsonValue :: Structure -> JsonType -> * where
 
+data StringChecker
+
+data NumberChecker
 
 data JsonType
   = StringType
@@ -78,6 +81,5 @@ data JsonType
   | ArrayType
   | NullType
   | BooleanType
-  deriving (Eq, Ord, Show, Generic)
 
 data BoolOperator = BoolAnd | BoolOr
