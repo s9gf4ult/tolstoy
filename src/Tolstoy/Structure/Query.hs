@@ -56,29 +56,80 @@ data StructureCondition :: Structure -> * where
     -- ^ Right condition
     -> StructureCondition s
   StringCondition
-    :: StructureJsonValue s 'StringType
+    :: StructureJsonValue s ('JsonValueType n 'StringType)
     -> StringChecker
     -> StructureCondition s
   NumberCondition
-    :: StructureJsonValue s 'NumberType
+    :: StructureJsonValue s ('JsonValueType n 'NumberType)
     -> NumberChecker
     -> StructureCondition s
   BoolEqCondition
-    :: StructureJsonValue s 'BooleanType
+    :: StructureJsonValue s ('JsonValueType n 'BooleanType)
     -> Bool
     -> StructureCondition s
+  NullableCondition
+    :: StructureJsonValue s ('JsonValueType 'Nullable t)
+    -> Nullable
+    -- ^ Here 'Nullable' turns into "== null" and 'Strict' turns into
+    -- "<> null"
+    -> StructureCondition s
 
-data StructureJsonValue :: Structure -> JsonType -> * where
-  PathValue :: StructurePath s sub -> StructureJsonValue s (StructType sub)
+data StructureJsonValue :: Structure -> JsonValueType -> * where
+  PathValue :: StructurePath s sub -> StructureJsonValue s (StructValueType sub)
   NumberOperatorValue
     :: NumberOperator
-    -> StructureJsonValue s 'NumberType
-    -> StructureJsonValue s 'NumberType
-    -> StructureJsonValue s 'NumberType
+    -> StructureJsonValue s ('JsonValueType n1 'NumberType)
+    -> StructureJsonValue s ('JsonValueType n2 'NumberType)
+    -> StructureJsonValue s ('JsonValueType (N2 n1 n2) 'NumberType)
+  -- | Call the ".type()" jsonpath function. It always returns the string
+  TypeOfValue
+    :: StructureJsonValue s t
+    -> StructureJsonValue s ('JsonValueType 'Strict 'StringType)
+  -- | Call the ".size()" jsonpath function. Anways returns number
+  SizeOfValue
+    :: StructureJsonValue s ('JsonValueType 'Strict 'ArrayType)
+    -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
+  -- | Call the ".double()" jsonpath function. Accepts only string or
+  -- number. But there is no reason to call it on numbers. So we are
+  -- restricting it on strings only.
+  DoubleValue
+    :: StructureJsonValue s ('JsonValueType 'Strict 'StringType)
+    -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
+  -- | Calls one of the number methods. Accepts number only
+  NumberMethodValue
+    :: NumberMethod
+    -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
+    -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
+
+data NumberMethod = Ceiling | Floor | Abs
+
+type family StructType (s :: Structure) :: JsonType where
+  StructType StructString = 'StringType
+  StructType StructNumber = 'NumberType
+  StructType StructBool = 'BooleanType
+  StructType (StructOptional s) = StructType s
+  StructType (StructVector s) = 'ArrayType
+  StructType (StructSum s) = 'ObjectType
+  StructType (StructProduct s) = 'ObjectType
+
+type family StructValueType (s :: Structure) :: JsonValueType where
+  StructValueType ('StructOptional s) = 'JsonValueType 'Nullable (StructType s)
+  StructValueType s = 'JsonValueType 'Strict (StructType s)
+
+type family N2 (n1 :: Nullable) (n2 :: Nullable) :: Nullable where
+  N2 'Nullable n2 = 'Nullable
+  N2 n1 'Nullable = 'Nullable
+  N2 n1 n2 = 'Strict
+
+data NumberOperator
 
 data StringChecker
 
 data NumberChecker
+
+data Nullable = Nullable | Strict
+
+data JsonValueType = JsonValueType Nullable JsonType
 
 data JsonType
   = StringType
