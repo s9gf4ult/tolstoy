@@ -69,6 +69,12 @@ data StructureCondition :: Structure -> * where
     -> StructureCondition s
 
 data StructureJsonValue :: Structure -> JsonType -> * where
+  PathValue :: StructurePath s sub -> StructureJsonValue s (StructType sub)
+  NumberOperatorValue
+    :: NumberOperator
+    -> StructureJsonValue s 'NumberType
+    -> StructureJsonValue s 'NumberType
+    -> StructureJsonValue s 'NumberType
 
 data StringChecker
 
