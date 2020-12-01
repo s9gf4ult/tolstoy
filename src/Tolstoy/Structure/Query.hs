@@ -1,21 +1,31 @@
 module Tolstoy.Structure.Query where
 
-import Data.Proxy
-import GHC.TypeLits
-import Tolstoy.Structure.Kind
+import           Data.Proxy
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           GHC.TypeLits
+import           Tolstoy.Structure.Kind
 
 -- | The path inside some structure. First argument is the structure
 -- to query on. The second is the structure the path returns.
 data StructurePath :: Structure -> Structure -> * where
+  -- | End of the path. Generates nothing
   ThisPath :: StructurePath s s
+  -- | Path inside of optional value. Generates filtering of null
+  -- values "? (@ <> null)"
   OptionalPath :: StructurePath s sub -> StructurePath ('StructOptional s) sub
-  VectorPath :: VectorIndex -> StructurePath s sub -> StructurePath ('StructVector s) sub
+  -- | Path inside of a vector. Generates "[*]" or "[0]" or "[0-10]"
+  -- depending on vector index argument
+  VectorPath
+    :: VectorIndex
+    -> StructurePath s sub
+    -> StructurePath ('StructVector s) sub
+  -- | Path inside of some sum element.
+  -- Generates filtering "? (@.tag == "tag_name").value""
   SumPath :: SumPathTree t sub -> StructurePath ('StructSum t) sub
+  -- | Path inside of some product element. Generates simple field
+  -- accessor ".field_name"
   ProductPath :: ProductPathTree t sub -> StructurePath ('StructProduct t) sub
-
-data VectorIndex = VectorAny | VectorRange IndexRange
-
-data IndexRange = IndexThis Int | IndexRange Int Int
 
 -- | Subquery on some value of the sum. Example "? (@.tag == "some_tag").value"
 data SumPathTree :: SumTree -> Structure -> * where
@@ -45,9 +55,27 @@ data ProductPathTree :: ProductTree -> Structure -> * where
     :: ProductPathTree r sub
     -> ProductPathTree ('Product2 l r) sub
 
+data VectorIndex
+  = VectorAny
+  -- ^ "[*]"
+  | VectorRange IndexRange
+  -- ^ "[0]" or "[0-10]" depending on range
+
+data IndexRange = IndexExact Int | IndexRange Int Int
+
+-- | Note that condition is not just a value of boolean
+-- type. Condition is not a value at all. You can use logical
+-- operators like "&&" on conditions but not on boolean
+-- values. Meaning that the "true && false" is not valid jsonpath
+-- construction, but "true == true && false == true" is valid. Also
+-- you can not compare conditions with booleans like "(true == false)
+-- == false". That is why conditions have distinct type.
 data StructureCondition :: Structure -> * where
+  -- | "!(true == false)"
   NotCondition :: StructureCondition s -> StructureCondition s
+  -- | "? exists(@[*] == true)"
   ExistsCondition :: StructureCondition s -> StructureCondition s
+  -- | $.name == "john" && $.last_name == "doe"
   BinaryCondition
     :: BoolOperator
     -> StructureCondition s
@@ -55,18 +83,22 @@ data StructureCondition :: Structure -> * where
     -> StructureCondition s
     -- ^ Right condition
     -> StructureCondition s
+  -- | "string" == "string"
   StringCondition
     :: StructureJsonValue s ('JsonValueType n 'StringType)
     -> StringChecker
     -> StructureCondition s
+  -- | 2 > 3
   NumberCondition
     :: StructureJsonValue s ('JsonValueType n 'NumberType)
     -> NumberChecker
     -> StructureCondition s
+  -- | $.a == true
   BoolEqCondition
     :: StructureJsonValue s ('JsonValueType n 'BooleanType)
     -> Bool
     -> StructureCondition s
+  --
   NullableCondition
     :: StructureJsonValue s ('JsonValueType 'Nullable t)
     -> Nullable
@@ -74,34 +106,53 @@ data StructureCondition :: Structure -> * where
     -- "<> null"
     -> StructureCondition s
 
+-- | Values can be constructed from simple path, but also with some
+-- operators and methods. Values can be strict and optional. Optional
+-- value can be either null or some other value. Strict value can not
+-- be null.
 data StructureJsonValue :: Structure -> JsonValueType -> * where
+  -- | Some path value, like "$.a[*].b"
   PathValue :: StructurePath s sub -> StructureJsonValue s (StructValueType sub)
+  -- | Two numbers can be combined with one of operators, like "3 + 4"
+  -- is also a number.
   NumberOperatorValue
     :: NumberOperator
-    -> StructureJsonValue s ('JsonValueType n1 'NumberType)
-    -> StructureJsonValue s ('JsonValueType n2 'NumberType)
-    -> StructureJsonValue s ('JsonValueType (N2 n1 n2) 'NumberType)
-  -- | Call the ".type()" jsonpath function. It always returns the string
+    -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
+    -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
+    -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
+  -- | Call the ".type()" jsonpath function. It always returns the
+  -- string on any input value
   TypeOfValue
     :: StructureJsonValue s t
     -> StructureJsonValue s ('JsonValueType 'Strict 'StringType)
-  -- | Call the ".size()" jsonpath function. Anways returns number
+  -- | Call the ".size()" jsonpath function. Anways returns
+  -- number. The "size" always returns 1 on any non-array value. So we
+  -- decline nulls to avoid this weird silent behaviour.
   SizeOfValue
     :: StructureJsonValue s ('JsonValueType 'Strict 'ArrayType)
     -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
-  -- | Call the ".double()" jsonpath function. Accepts only string or
-  -- number. But there is no reason to call it on numbers. So we are
-  -- restricting it on strings only.
-  DoubleValue
+  -- | Call the ".double()" jsonpath method. Accepts only string or
+  -- number. But there is constructor is only for strings. "double"
+  -- fails on null so the string must be strict
+  StringToDouble
     :: StructureJsonValue s ('JsonValueType 'Strict 'StringType)
     -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
-  -- | Calls one of the number methods. Accepts number only
+  -- | Calls one of the number methods. Accepts number only. All
+  -- methods fail if null occured, so it requires strict number
   NumberMethodValue
     :: NumberMethod
     -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
     -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
 
-data NumberMethod = Ceiling | Floor | Abs
+data NumberMethod
+  = NumberCeiling
+  -- ^ ".ceiling()" method
+  | NumberFloor
+  -- ^ ".floor()" method
+  | NumberAbs
+  -- ^ ".abs()" method
+  | NumberDouble
+  -- ^ ".double()" method for numbers
 
 type family StructType (s :: Structure) :: JsonType where
   StructType StructString = 'StringType
@@ -122,8 +173,28 @@ type family N2 (n1 :: Nullable) (n2 :: Nullable) :: Nullable where
   N2 n1 n2 = 'Strict
 
 data NumberOperator
+  = NumberPlus
+  | NumberMinus
+  | NumberMultiply
+  | NumberDivide
+  | NumberModulus
 
 data StringChecker
+  = StringEq Text
+  | StringNotEq Text
+  | StringLikeRegex Text [RegexFlag]
+  | StringStartsWith Text
+
+data RegexFlag
+  = RegexIFlag
+  -- ^ i for case-insensitive match
+  | RegexMFlag
+  -- ^ m to allow ^ and $ to match at newlines
+  | RegexSFlag
+  -- ^ s to allow . to match a newline
+  | RegexQFlag
+  -- ^ q to quote the whole pattern (reducing the behavior to a simple
+  -- substring match).
 
 data NumberChecker
 
