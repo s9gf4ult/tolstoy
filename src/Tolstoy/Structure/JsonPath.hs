@@ -1,4 +1,4 @@
-module Tolstoy.Structure.Query where
+module Tolstoy.Structure.JsonPath where
 
 import           Data.Proxy
 import           Data.Scientific
