@@ -1,6 +1,7 @@
 module Tolstoy.Structure.Query where
 
 import           Data.Proxy
+import           Data.Scientific
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           GHC.TypeLits
@@ -76,45 +77,72 @@ data StructureCondition :: Structure -> * where
   -- | "? exists(@[*] == true)"
   ExistsCondition :: StructureCondition s -> StructureCondition s
   -- | $.name == "john" && $.last_name == "doe"
-  BinaryCondition
+  BoolCondition
     :: BoolOperator
     -> StructureCondition s
     -- ^ Left condition
     -> StructureCondition s
     -- ^ Right condition
     -> StructureCondition s
-  -- | "string" == "string"
+  -- | "string" == "string", or 10 <> 42. Actually the "==" returns
+  -- "true" only with two numbers, strings, nulls or booleans. On
+  -- objects it always returns "null", on arrays it returns
+  -- "false". It always returns "false" on two different types
+  EqCondition
+    :: (Comparable t)
+    => EqOperator
+    -> StructureJsonValue s ('JsonValueType n t)
+    -> StructureJsonValue s ('JsonValueType n t)
+    -> StructureCondition s
+  -- | Compare two values with different nullability. Sometimes might
+  -- help
+  EqLaxCondition
+    :: (Comparable t)
+    => EqOperator
+    -> StructureJsonValue s ('JsonValueType n1 t)
+    -> StructureJsonValue s ('JsonValueType n2 t)
+    -> StructureCondition s
+  -- | "like_regex" or "starts with". Returns null on null input.
   StringCondition
     :: StructureJsonValue s ('JsonValueType n 'StringType)
     -> StringChecker
     -> StructureCondition s
-  -- | 2 > 3
-  NumberCondition
-    :: StructureJsonValue s ('JsonValueType n 'NumberType)
-    -> NumberChecker
+  -- | 2 > 3. Returns false if any of arguments is null.
+  NumberCompareCondition
+    :: NumberCompare
+    -> StructureJsonValue s ('JsonValueType n1 'NumberType)
+    -> StructureJsonValue s ('JsonValueType n2 'NumberType)
     -> StructureCondition s
-  -- | $.a == true
-  BoolEqCondition
-    :: StructureJsonValue s ('JsonValueType n 'BooleanType)
-    -> Bool
-    -> StructureCondition s
-  --
-  NullableCondition
-    :: StructureJsonValue s ('JsonValueType 'Nullable t)
-    -> Nullable
-    -- ^ Here 'Nullable' turns into "== null" and 'Strict' turns into
-    -- "<> null"
-    -> StructureCondition s
+
+data EqOperator = EqOperator | NotEqOperator
+
+-- | Only these types are comparable with "==" operator
+class Comparable (t :: JsonType)
+instance Comparable 'StringType
+instance Comparable 'NumberType
+instance Comparable 'NullType
+instance Comparable 'BooleanType
 
 -- | Values can be constructed from simple path, but also with some
 -- operators and methods. Values can be strict and optional. Optional
 -- value can be either null or some other value. Strict value can not
 -- be null.
 data StructureJsonValue :: Structure -> JsonValueType -> * where
+  LiteralStringValue
+    :: Text
+    -> StructureJsonValue s ('JsonValueType n 'StringType)
+  LiteralNumberValue
+    :: Scientific
+    -> StructureJsonValue s ('JsonValueType n 'NumberType)
+  LiteralBoolValue
+    :: Bool
+    -> StructureJsonValue s ('JsonValueType n 'BooleanType)
+  -- | null is the nullable value of any type. Deal with it.
+  LiteralNullValue :: StructureJsonValue s ('JsonValueType 'Nullable t)
   -- | Some path value, like "$.a[*].b"
   PathValue :: StructurePath s sub -> StructureJsonValue s (StructValueType sub)
   -- | Two numbers can be combined with one of operators, like "3 + 4"
-  -- is also a number.
+  -- is also a number. All operators fail on null.
   NumberOperatorValue
     :: NumberOperator
     -> StructureJsonValue s ('JsonValueType 'Strict 'NumberType)
@@ -180,9 +208,7 @@ data NumberOperator
   | NumberModulus
 
 data StringChecker
-  = StringEq Text
-  | StringNotEq Text
-  | StringLikeRegex Text [RegexFlag]
+  = StringLikeRegex Text [RegexFlag]
   | StringStartsWith Text
 
 data RegexFlag
@@ -196,7 +222,11 @@ data RegexFlag
   -- ^ q to quote the whole pattern (reducing the behavior to a simple
   -- substring match).
 
-data NumberChecker
+data NumberCompare
+  = NumberLT
+  | NumberLE
+  | NumberGT
+  | NumberGE
 
 data Nullable = Nullable | Strict
 
