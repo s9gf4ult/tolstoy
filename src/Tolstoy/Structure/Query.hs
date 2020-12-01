@@ -12,6 +12,9 @@ import           Tolstoy.Structure.Kind
 data StructurePath :: Structure -> Structure -> * where
   -- | End of the path. Generates nothing
   ThisPath :: StructurePath s s
+  -- | Path which do not change the nesting level, but changes the set
+  -- of values returned by path. Example: ? (@.key == "some_key")
+  FilteredPath :: StructureCondition s -> StructurePath s s
   -- | Path inside of optional value. Generates filtering of null
   -- values "? (@ <> null)"
   OptionalPath :: StructurePath s sub -> StructurePath ('StructOptional s) sub
