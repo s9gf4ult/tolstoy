@@ -92,16 +92,16 @@ data StructureCondition :: Structure -> * where
   -- objects it always returns "null", on arrays it returns
   -- "false". It always returns "false" on two different types
   EqCondition
-    :: (Comparable t)
-    => EqOperator
+    :: Eqable t
+    -> EqOperator
     -> StructureJsonValue s ('JsonValueType n t)
     -> StructureJsonValue s ('JsonValueType n t)
     -> StructureCondition s
   -- | Compare two values with different nullability. Sometimes might
   -- help
   EqLaxCondition
-    :: (Comparable t)
-    => EqOperator
+    :: Eqable t
+    -> EqOperator
     -> StructureJsonValue s ('JsonValueType n1 t)
     -> StructureJsonValue s ('JsonValueType n2 t)
     -> StructureCondition s
@@ -119,12 +119,12 @@ data StructureCondition :: Structure -> * where
 
 data EqOperator = EqOperator | NotEqOperator
 
--- | Only these types are comparable with "==" operator
-class Comparable (t :: JsonType)
-instance Comparable 'StringType
-instance Comparable 'NumberType
-instance Comparable 'NullType
-instance Comparable 'BooleanType
+-- | Restriction of types for "==" operator
+data Eqable :: JsonType -> * where
+  EqableString :: Eqable 'StringType
+  EqableNumber :: Eqable 'NumberType
+  EqableNull :: Eqable 'NullType
+  EqableBoolean :: Eqable 'BooleanType
 
 -- | Values can be constructed from simple path, but also with some
 -- operators and methods. Values can be strict and optional. Optional
