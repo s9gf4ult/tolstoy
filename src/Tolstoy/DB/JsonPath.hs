@@ -1,5 +1,7 @@
 module Tolstoy.DB.JsonPath where
 
+import           Data.Foldable
+import           Data.Functor
 import qualified Data.List as L
 import           Data.String
 import           Data.Text (Text)
@@ -15,9 +17,8 @@ renderQuery = \case
   QueryContext -> "@"
   QueryFilter q cond -> mconcat $ interspace $
     [ renderQuery q
-    , "? ("
-    , renderCond cond
-    , ")" ]
+    , "?"
+    , wrapBrackets $ renderCond cond ]
   QueryNesting q p -> renderQuery q <> renderJsonPath p
 
 renderJsonPath :: StructurePath s1 s2 -> Builder
@@ -30,9 +31,12 @@ renderJsonPath = \case
 renderVectorIndex :: VectorIndex -> Builder
 renderVectorIndex = \case
   VectorAny     -> "*"
-  VectorRange r -> case r of
-    IndexExact v   -> fromString $ show v
-    IndexRange a b -> fromString $ show a <> "-" <> show b
+  VectorRange r -> renderIndexRange r
+
+renderIndexRange :: IndexRange -> Builder
+renderIndexRange = \case
+  IndexExact v   -> fromString $ show v
+  IndexRange a b -> fromString $ show a <> " to " <> show b
 
 quoteText :: Text -> Builder
 quoteText = error "FIXME: quoteText not implemented"
@@ -124,6 +128,36 @@ renderValue = \case
   SizeOfValue v -> wrapBrackets (renderValue v) <> ".size()"
   StringToDouble v -> wrapBrackets (renderValue v) <> ".double()"
   NumberMethodValue m v -> wrapBrackets (renderValue v) <> renderNumberMethod m
+  ObjectAnyFieldValue v -> wrapBrackets (renderValue v) <> ".*"
+  RecursiveElementValue mind v -> wrapBrackets (renderValue v) <> ".**" <> deep
+    where
+      deep :: Builder
+      deep = fold $ mind <&> \ind ->
+        "{" <> renderIndexRange ind <> "}"
+  FilterTypeValue rep val -> mconcat $ interspace
+    [ wrapBrackets $ renderValue val
+    , "?"
+    , wrapBrackets filterRep ]
+    where
+      filterRep = case rep of
+        JsonValueTypeRep n t -> case concat [ nullable, types ] of
+          [cond] -> cond
+          conds  -> mconcat $ L.intersperse " || " $ wrapBrackets <$> conds
+          where
+            nullable = case n of
+              NullableRep -> [ "@ == null" ]
+              StrictRep   -> []
+            types =
+              let
+                tt = quoteText $ case t of
+                  StringTypeRep  -> "string"
+                  NumberTypeRep  -> "number"
+                  ObjectTypeRep  -> "object"
+                  ArrayTypeRep   -> "array"
+                  NullTypeRep    -> "null"
+                  BooleanTypeRep -> "boolean"
+              in [ "@.type() == " <> tt ]
+  FilterStrictValue v -> wrapBrackets (renderValue v) <> " ? (@ <> null)"
 
 renderNumberOperator :: NumberOperator -> Builder
 renderNumberOperator = \case
@@ -139,14 +173,6 @@ renderNumberMethod = \case
   NumberFloor -> ".floor()"
   NumberAbs -> ".abs()"
   NumberDouble -> ".double()"
-
--- | The root of the path
-data Root = Document | Context
-
-renderRoot :: Root -> Builder
-renderRoot = \case
-  Document -> "$"
-  Context -> "@"
 
 renderBoolOperator :: BoolOperator -> Builder
 renderBoolOperator = \case

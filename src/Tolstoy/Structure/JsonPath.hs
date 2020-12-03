@@ -213,6 +213,39 @@ data StructureJsonValue
     :: NumberMethod
     -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
     -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -- | Selects any field from object.  The ".*" operator.  Returns
+  -- literally any value.  Fails on nulls.  The constructor is not
+  -- StructurePath because we loose the type of the inner structure.
+  -- But we don't want to build untypeable paths. Nullability is set
+  -- by default, because we can not guarantee, that there are no nulls
+  -- inside of the object.
+  ObjectAnyFieldValue
+    :: StructureJsonValue r c ('JsonValueType 'Strict 'ObjectType)
+    -- ^ The object to nest in
+    -> StructureJsonValue r c ('JsonValueType 'Nullable t)
+  -- | Selects any field from object, or any element from array with
+  -- optional depth. Works with any type, even with null. Returns
+  -- literally any type. The constructor is not StructurePath because
+  -- we loose the type of the inner structure. But we don't want to
+  -- build untypeable paths. Nullability is set by default, because we
+  -- can not guarantee, that there are no nulls inside of the value.
+  RecursiveElementValue
+    :: Maybe IndexRange
+    -- ^ The level of nesting to traverse.
+    -> StructureJsonValue r c t1
+    -- ^ The value to nest in
+    -> StructureJsonValue r c ('JsonValueType 'Nullable t2)
+  -- | Filter any unknown types to specified one. Generates '?
+  -- (@.type() == "string"' for strings for example. Also passess
+  -- nulls like '? (@ == null || @.type() == "number")'
+  FilterTypeValue
+    :: JsonValueTypeRep ret
+    -> StructureJsonValue r c t
+    -> StructureJsonValue r c ret
+  -- | ? (@ <> null)
+  FilterStrictValue
+    :: StructureJsonValue r c ('JsonValueType n t)
+    -> StructureJsonValue r c ('JsonValueType 'Strict t)
 
 data NumberMethod
   = NumberCeiling
@@ -272,7 +305,17 @@ data NumberCompare
 
 data Nullable = Nullable | Strict
 
+data NullableRep :: Nullable -> * where
+  NullableRep :: NullableRep 'Nullable
+  StrictRep :: NullableRep 'Strict
+
 data JsonValueType = JsonValueType Nullable JsonType
+
+data JsonValueTypeRep :: JsonValueType -> * where
+  JsonValueTypeRep
+    :: NullableRep n
+    -> JsonTypeRep t
+    -> JsonValueTypeRep ('JsonValueType n t)
 
 data JsonType
   = StringType
@@ -281,5 +324,13 @@ data JsonType
   | ArrayType
   | NullType
   | BooleanType
+
+data JsonTypeRep :: JsonType -> * where
+  StringTypeRep :: JsonTypeRep 'StringType
+  NumberTypeRep :: JsonTypeRep 'NumberType
+  ObjectTypeRep :: JsonTypeRep 'ObjectType
+  ArrayTypeRep :: JsonTypeRep 'ArrayType
+  NullTypeRep :: JsonTypeRep 'NullType
+  BooleanTypeRep :: JsonTypeRep 'BooleanType
 
 data BoolOperator = BoolAnd | BoolOr
