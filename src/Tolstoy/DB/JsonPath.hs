@@ -116,6 +116,29 @@ renderValue = \case
     False -> "false"
   LiteralNullValue -> "null"
   QueryValue q -> renderQuery q
+  NumberOperatorValue op a b -> mconcat $ interspace
+    [ wrapBrackets $ renderValue a
+    , renderNumberOperator op
+    , wrapBrackets $ renderValue b ]
+  TypeOfValue v ->  wrapBrackets (renderValue v) <> ".type()"
+  SizeOfValue v -> wrapBrackets (renderValue v) <> ".size()"
+  StringToDouble v -> wrapBrackets (renderValue v) <> ".double()"
+  NumberMethodValue m v -> wrapBrackets (renderValue v) <> renderNumberMethod m
+
+renderNumberOperator :: NumberOperator -> Builder
+renderNumberOperator = \case
+  NumberPlus -> "+"
+  NumberMinus -> "-"
+  NumberMultiply -> "*"
+  NumberDivide -> "/"
+  NumberModulus -> "%"
+
+renderNumberMethod :: NumberMethod -> Builder
+renderNumberMethod = \case
+  NumberCeiling -> ".ceiling()"
+  NumberFloor -> ".floor()"
+  NumberAbs -> ".abs()"
+  NumberDouble -> ".double()"
 
 -- | The root of the path
 data Root = Document | Context
