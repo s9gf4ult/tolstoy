@@ -4,6 +4,7 @@ import           Data.Proxy
 import           Data.Scientific
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           GHC.Generics (Generic)
 import           GHC.TypeLits
 import           Tolstoy.Structure.Kind
 
@@ -29,11 +30,16 @@ data StructureQuery
     -> StructureQuery r c ret
     -- ^ When we exit the filter context doesn't change.
   QueryNesting
-    :: StructureQuery r c inner
+    :: ( Show (StructureQuery r c inner)
+       , Show (StructurePath inner outer)
+       )
+    => StructureQuery r c inner
     -- ^ Query before the filter
     -> StructurePath inner outer
     -- ^ Path inside of the
     -> StructureQuery r c outer
+
+deriving instance Show (StructureQuery r c ret)
 
 -- | The path inside some structure. First argument is the structure
 -- to query on. The second is the structure the path returns.
@@ -58,6 +64,8 @@ data StructurePath
   -- accessor ".field_name"
   ProductPath :: ProductPathTree t sub -> StructurePath ('StructProduct t) sub
 
+deriving instance Show (StructurePath c ret)
+
 -- | Subquery on some value of the sum. Example "? (@.tag == "some_tag").value"
 data SumPathTree :: SumTree -> Structure -> * where
   Sum1PathTree
@@ -70,6 +78,8 @@ data SumPathTree :: SumTree -> Structure -> * where
   Sum2RightPathTree
     :: !(SumPathTree r sub)
     -> SumPathTree ('Sum2 l r) sub
+
+deriving instance Show (SumPathTree t s)
 
 -- | Subquery on some field of the product. Example ".field_name"
 data ProductPathTree :: ProductTree -> Structure -> * where
@@ -84,13 +94,17 @@ data ProductPathTree :: ProductTree -> Structure -> * where
     :: ProductPathTree r sub
     -> ProductPathTree ('Product2 l r) sub
 
+deriving instance Show (ProductPathTree t s)
+
 data VectorIndex
   = VectorAny
   -- ^ "[*]"
   | VectorRange IndexRange
   -- ^ "[0]" or "[0-10]" depending on range
+  deriving (Eq, Ord, Show, Generic)
 
 data IndexRange = IndexExact Int | IndexRange Int Int
+  deriving (Eq, Ord, Show, Generic)
 
 -- | Note that condition is not just a value of boolean
 -- type. Condition is not a value at all. You can use logical
@@ -148,7 +162,10 @@ data StructureCondition
     -> StructureJsonValue r c ('JsonValueType n2 'NumberType)
     -> StructureCondition r c
 
+deriving instance Show (StructureCondition r c)
+
 data EqOperator = EqOperator | NotEqOperator
+  deriving (Eq, Ord, Show, Generic)
 
 -- | Restriction of types for "==" operator
 data Eqable :: JsonType -> * where
@@ -156,6 +173,8 @@ data Eqable :: JsonType -> * where
   EqableNumber :: Eqable 'NumberType
   EqableNull :: Eqable 'NullType
   EqableBoolean :: Eqable 'BooleanType
+
+deriving instance Show (Eqable t)
 
 -- | Values can be constructed from simple path, but also with some
 -- operators and methods. Values can be strict and optional. Optional
@@ -247,6 +266,8 @@ data StructureJsonValue
     :: StructureJsonValue r c ('JsonValueType n t)
     -> StructureJsonValue r c ('JsonValueType 'Strict t)
 
+deriving instance Show (StructureJsonValue r c t)
+
 data NumberMethod
   = NumberCeiling
   -- ^ ".ceiling()" method
@@ -256,6 +277,7 @@ data NumberMethod
   -- ^ ".abs()" method
   | NumberDouble
   -- ^ ".double()" method for numbers
+  deriving (Eq, Ord, Show, Generic)
 
 type family StructType (s :: Structure) :: JsonType where
   StructType StructString = 'StringType
@@ -281,10 +303,12 @@ data NumberOperator
   | NumberMultiply
   | NumberDivide
   | NumberModulus
+  deriving (Eq, Ord, Show, Generic)
 
 data StringChecker
   = StringLikeRegex Text [RegexFlag]
   | StringStartsWith Text
+  deriving (Eq, Ord, Show, Generic)
 
 data RegexFlag
   = RegexIFlag
@@ -296,26 +320,34 @@ data RegexFlag
   | RegexQFlag
   -- ^ q to quote the whole pattern (reducing the behavior to a simple
   -- substring match).
+  deriving (Eq, Ord, Show, Generic)
 
 data NumberCompare
   = NumberLT
   | NumberLE
   | NumberGT
   | NumberGE
+  deriving (Eq, Ord, Show, Generic)
 
 data Nullable = Nullable | Strict
+  deriving (Eq, Ord, Show, Generic)
 
 data NullableRep :: Nullable -> * where
   NullableRep :: NullableRep 'Nullable
   StrictRep :: NullableRep 'Strict
 
+deriving instance Show (NullableRep n)
+
 data JsonValueType = JsonValueType Nullable JsonType
+  deriving (Eq, Ord, Show, Generic)
 
 data JsonValueTypeRep :: JsonValueType -> * where
   JsonValueTypeRep
     :: NullableRep n
     -> JsonTypeRep t
     -> JsonValueTypeRep ('JsonValueType n t)
+
+deriving instance Show (JsonValueTypeRep t)
 
 data JsonType
   = StringType
@@ -324,6 +356,7 @@ data JsonType
   | ArrayType
   | NullType
   | BooleanType
+  deriving (Eq, Ord, Show, Generic)
 
 data JsonTypeRep :: JsonType -> * where
   StringTypeRep :: JsonTypeRep 'StringType
@@ -333,4 +366,7 @@ data JsonTypeRep :: JsonType -> * where
   NullTypeRep :: JsonTypeRep 'NullType
   BooleanTypeRep :: JsonTypeRep 'BooleanType
 
+deriving instance Show (JsonTypeRep t)
+
 data BoolOperator = BoolAnd | BoolOr
+  deriving (Eq, Ord, Show, Generic)

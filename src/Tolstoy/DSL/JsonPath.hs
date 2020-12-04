@@ -2,20 +2,24 @@ module Tolstoy.DSL.JsonPath where
 
 import Tolstoy.Structure.JsonPath
 
-($:) :: StructureQuery r c r
-($:) = QueryRoot
+root :: StructureQuery r c r
+root = QueryRoot
 
-(@:) :: StructureQuery r ('Just c) c
-(@:) = QueryContext
+ctx :: StructureQuery r ('Just c) c
+ctx = QueryContext
 
 (?:)
-  :: StructureCondition r ('Just ret)
+  :: StructureQuery r c ret
+  -> StructureCondition r ('Just ret)
   -> StructureQuery r c ret
-  -> StructureQuery r c ret
-(?:) cond q = QueryFilter q cond
+(?:) = QueryFilter
+
+infixl 7 ?:
 
 (.:)
-  :: StructurePath inner outer
-  -> StructureQuery r c inner
+  :: StructureQuery r c inner
+  -> StructurePath inner outer
   -> StructureQuery r c outer
-(.:) p q = QueryNesting q p
+(.:) = QueryNesting
+
+infixl 8 .:
