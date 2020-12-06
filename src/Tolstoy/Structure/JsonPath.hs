@@ -139,14 +139,6 @@ data StructureCondition
   EqCondition
     :: Eqable t
     -> EqOperator
-    -> StructureJsonValue r c ('JsonValueType n t)
-    -> StructureJsonValue r c ('JsonValueType n t)
-    -> StructureCondition r c
-  -- | Compare two values with different nullability. Sometimes might
-  -- help
-  EqLaxCondition
-    :: Eqable t
-    -> EqOperator
     -> StructureJsonValue r c ('JsonValueType n1 t)
     -> StructureJsonValue r c ('JsonValueType n2 t)
     -> StructureCondition r c

@@ -75,10 +75,6 @@ renderCond = \case
     [ wrapBrackets $ renderValue a
     , renderEqOperator op
     , wrapBrackets $ renderValue b ]
-  EqLaxCondition _ op a b -> mconcat $ interspace
-    [ wrapBrackets $ renderValue a
-    , renderEqOperator op
-    , wrapBrackets $ renderValue b ]
   StringCondition v check -> mconcat $ interspace
     [ wrapBrackets $ renderValue v
     , renderStringChecker check ]
