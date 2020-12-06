@@ -1,4 +1,4 @@
-module Tolstoy.DSL.JsonPath where
+module Tolstoy.DSL.JsonPath.Build where
 
 import Tolstoy.Structure.JsonPath
 import Tolstoy.DSL.Render

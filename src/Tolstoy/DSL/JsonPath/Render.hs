@@ -1,4 +1,4 @@
-module Tolstoy.DSL.Render where
+module Tolstoy.DSL.JsonPath.Render where
 
 import           Data.Foldable
 import           Data.Functor
