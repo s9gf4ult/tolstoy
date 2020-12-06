@@ -1,6 +1,7 @@
 module Tolstoy.DSL.JsonPath where
 
 import Tolstoy.Structure.JsonPath
+import Tolstoy.DSL.Render
 
 root :: StructureQuery r c r
 root = QueryRoot
@@ -23,3 +24,9 @@ infixl 7 ?:
 (.:) = QueryNesting
 
 infixl 8 .:
+
+renderQuery
+  :: forall root ret. (Structural root, Structural ret)
+  => StructureQuery (StructKind root) 'Nothing (StructKind ret)
+  -> Text
+renderQuery =

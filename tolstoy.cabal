@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 42f5fac58ac92076e9ed2dcd5c1322de307132640da0e494d89eef71db4cb440
+-- hash: a7d0de534e4c3dd577c6b2ebeb2aa03f6015dfbb4a272ee1cd6bc90c8b16538b
 
 name:           tolstoy
 version:        0.0.1
@@ -30,8 +30,8 @@ library
       Test.Tolstoy.Migrations
       Tolstoy.DB
       Tolstoy.DB.Init
-      Tolstoy.DB.JsonPath
       Tolstoy.DSL.JsonPath
+      Tolstoy.DSL.Render
       Tolstoy.Migration
       Tolstoy.Migration.Obvious
       Tolstoy.Structure
@@ -80,6 +80,7 @@ test-suite tolstoy-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      JsonPath
       ObviousTests
       ObviousTests.Alter
       ObviousTests.Alter2
