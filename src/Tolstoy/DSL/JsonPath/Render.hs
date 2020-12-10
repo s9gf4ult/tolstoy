@@ -43,7 +43,12 @@ renderIndexRange = \case
   IndexRange a b -> fromString $ show a <> " to " <> show b
 
 quoteText :: Text -> Builder
-quoteText = error "FIXME: quoteText not implemented"
+quoteText t = TB.singleton '"' <> b <> TB.singleton '"'
+  where
+    b = fromString $ T.unpack t >>= f
+    f = \case
+      '"' -> "\""
+      c   -> [c]
 
 wrapBrackets :: Builder -> Builder
 wrapBrackets a = "(" <> a <> ")"

@@ -13,6 +13,6 @@ data Rec = Rec
 
 instance Structural Rec
 
--- t :: TL.Text
--- t = renderQuery @Rec $ root ?:
---   (QueryValue (ctx .: prodElem @"string") `like_regex` "regex")
+t :: TL.Text
+t = renderQuery @Rec $ root ?:
+  (QueryValue (ctx .: prodElem @"string") `like_regex` "regex")

@@ -71,7 +71,9 @@ instance
 sumElem
   :: forall tag sub tree
   . ( KnownSumPathTree tag tree sub (WhereSum tree ('Sum1 tag sub))
-    , KnownSymbol tag )
+    , KnownSymbol tag
+    , sub ~ (SumElem tree tag)
+    )
   => StructurePath ('StructSum tree) sub
 sumElem = SumPath (Proxy @tag) knownSumPathTree
 
@@ -98,6 +100,7 @@ prodElem
   :: forall tag sub tree
   . ( KnownProductPathTree tag tree sub (WhereProd tree ('Product1 tag sub))
     , KnownSymbol tag
+    , sub ~ (ProdElem tree tag)
     )
   => StructurePath ('StructProduct tree) sub
 prodElem = ProductPath (Proxy @tag) knownProductPathTree

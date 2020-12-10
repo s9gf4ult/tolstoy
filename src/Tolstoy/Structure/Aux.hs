@@ -1,6 +1,33 @@
+{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
+
 module Tolstoy.Structure.Aux where
 
+import GHC.TypeLits
 import Tolstoy.Structure.Kind
+import TypeFun.Data.Maybe
+
+type ProdElem p tag = FromJust (ProdElemMay p tag)
+
+-- | Finds product element by tag.
+type family ProdElemMay (p :: ProductTree) (tag :: Symbol) :: Maybe Structure where
+  ProdElemMay (Product1 tag s) tag = Just s
+  ProdElemMay (Product2 l r) tag =
+    OneOf (ProdElemMay l tag) (ProdElemMay r tag)
+  ProdElemMay p t = Nothing
+
+type SumElem s tag = FromJust (SumElemMay s tag)
+
+-- | Finds sum element by tag.
+type family SumElemMay (p :: SumTree) (tag :: Symbol) :: Maybe Structure where
+  SumElemMay (Sum1 tag s) tag = Just s
+  SumElemMay (Sum2 l r) tag = OneOf (SumElemMay l tag) (SumElemMay r tag)
+  SumElemMay a b = Nothing
+
+type family OneOf (a :: Maybe Structure) (b :: Maybe Structure) :: Maybe Structure where
+  OneOf Nothing (Just b) = Just b
+  OneOf (Just a) Nothing = Just a
+  OneOf a b = Nothing
+
 
 -- | Where to direct the instance. To the left branch
 -- construction/deconstruction or to the right
