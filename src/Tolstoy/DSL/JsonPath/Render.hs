@@ -25,8 +25,12 @@ renderJsonPath :: StructurePath s1 s2 -> Builder
 renderJsonPath = \case
   OptionalPath -> " ? (@ <> null)"
   VectorPath vind -> "[" <> renderVectorIndex vind <> "]"
-  SumPath sumPath -> renderSumPath sumPath
-  ProductPath prodPath -> renderProductPath prodPath
+  SumPath tag sumPath -> renderSumPath tagName sumPath
+    where
+      tagName = T.pack $ symbolVal tag
+  ProductPath tag prodPath -> renderProductPath tagName prodPath
+    where
+      tagName = T.pack $ symbolVal tag
 
 renderVectorIndex :: VectorIndex -> Builder
 renderVectorIndex = \case
@@ -47,21 +51,17 @@ wrapBrackets a = "(" <> a <> ")"
 interspace :: [Builder] -> [Builder]
 interspace = L.intersperse $ TB.singleton ' '
 
-renderSumPath :: SumPathTree s sub -> Builder
-renderSumPath = \case
-  Sum1PathTree n -> " ? (@.tag == " <> quoteText tagName <> ").value"
-    where
-      tagName = T.pack $ symbolVal n
-  Sum2LeftPathTree l -> renderSumPath l
-  Sum2RightPathTree r -> renderSumPath r
+renderSumPath :: Text -> SumPathTree tag s sub -> Builder
+renderSumPath tagName = \case
+  Sum1PathTree -> " ? (@.tag == " <> quoteText tagName <> ").value"
+  Sum2LeftPathTree l -> renderSumPath tagName l
+  Sum2RightPathTree r -> renderSumPath tagName r
 
-renderProductPath :: ProductPathTree s sub -> Builder
-renderProductPath = \case
-  Product1PathTree n -> "." <> quoteText tagName
-    where
-      tagName = T.pack $ symbolVal n
-  Product2LeftPathTree l -> renderProductPath l
-  Product2RightPathTree r -> renderProductPath r
+renderProductPath :: Text -> ProductPathTree tag s sub -> Builder
+renderProductPath tagName = \case
+  Product1PathTree -> "." <> quoteText tagName
+  Product2LeftPathTree l -> renderProductPath tagName l
+  Product2RightPathTree r -> renderProductPath tagName r
 
 renderCond :: StructureCondition r c -> Builder
 renderCond = \case

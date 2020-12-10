@@ -59,42 +59,46 @@ data StructurePath
     -> StructurePath ('StructVector s) s
   -- | Path inside of some sum element.
   -- Generates filtering "? (@.tag == "tag_name").value""
-  SumPath :: SumPathTree t sub -> StructurePath ('StructSum t) sub
+  SumPath
+    :: (KnownSymbol tag)
+    => Proxy tag
+    -> SumPathTree tag t sub
+    -> StructurePath ('StructSum t) sub
   -- | Path inside of some product element. Generates simple field
   -- accessor ".field_name"
-  ProductPath :: ProductPathTree t sub -> StructurePath ('StructProduct t) sub
+  ProductPath
+    :: (KnownSymbol tag)
+    => Proxy tag
+    -> ProductPathTree tag t sub
+    -> StructurePath ('StructProduct t) sub
 
 deriving instance Show (StructurePath c ret)
 
 -- | Subquery on some value of the sum. Example "? (@.tag == "some_tag").value"
-data SumPathTree :: SumTree -> Structure -> * where
+data SumPathTree :: Symbol -> SumTree -> Structure -> * where
   Sum1PathTree
-    :: (KnownSymbol n)
-    => Proxy n
-    -> SumPathTree ('Sum1 n s) s
+    :: SumPathTree tag ('Sum1 tag s) s
   Sum2LeftPathTree
-    :: !(SumPathTree l sub)
-    -> SumPathTree ('Sum2 l r) sub
+    :: !(SumPathTree tag l sub)
+    -> SumPathTree tag ('Sum2 l r) sub
   Sum2RightPathTree
-    :: !(SumPathTree r sub)
-    -> SumPathTree ('Sum2 l r) sub
+    :: !(SumPathTree tag r sub)
+    -> SumPathTree tag ('Sum2 l r) sub
 
-deriving instance Show (SumPathTree t s)
+deriving instance Show (SumPathTree tag t s)
 
 -- | Subquery on some field of the product. Example ".field_name"
-data ProductPathTree :: ProductTree -> Structure -> * where
+data ProductPathTree :: Symbol -> ProductTree -> Structure -> * where
   Product1PathTree
-    :: (KnownSymbol n)
-    => Proxy n
-    -> ProductPathTree ('Product1 n s) s
+    :: ProductPathTree tag ('Product1 tag s) s
   Product2LeftPathTree
-    :: ProductPathTree l sub
-    -> ProductPathTree ('Product2 l r) sub
+    :: ProductPathTree tag l sub
+    -> ProductPathTree tag ('Product2 l r) sub
   Product2RightPathTree
-    :: ProductPathTree r sub
-    -> ProductPathTree ('Product2 l r) sub
+    :: ProductPathTree tag r sub
+    -> ProductPathTree tag ('Product2 l r) sub
 
-deriving instance Show (ProductPathTree t s)
+deriving instance Show (ProductPathTree tag t s)
 
 data VectorIndex
   = VectorAny

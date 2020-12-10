@@ -2,13 +2,14 @@
 
 module Tolstoy.DSL.JsonPath.Build where
 
+import           Data.Proxy
 import           Data.Scientific
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
+import           GHC.TypeLits
 import           Tolstoy.DSL.JsonPath.Render as Render
 import           Tolstoy.Structure
-import           Tolstoy.Structure.JsonPath
 
 -- Query
 
@@ -33,6 +34,73 @@ infixl 7 ?:
 (.:) = QueryNesting
 
 infixl 8 .:
+
+-- Path
+
+optional :: StructurePath ('StructOptional s) s
+optional = OptionalPath
+
+vectorAny :: StructurePath ('StructVector s) s
+vectorAny = VectorPath VectorAny
+
+vectorIndex :: Int -> StructurePath ('StructVector s) s
+vectorIndex i = VectorPath $ VectorRange $ IndexExact i
+
+vectorRange :: Int -> Int -> StructurePath ('StructVector s) s
+vectorRange a b = VectorPath $ VectorRange $ IndexRange a b
+
+class (g ~ WhereSum tree ('Sum1 tag sub))
+  => KnownSumPathTree (tag :: Symbol) (tree :: SumTree) (sub :: Structure) (g :: Maybe Goto)where
+  knownSumPathTree :: SumPathTree tag tree sub
+
+instance KnownSumPathTree tag ('Sum1 tag s) s ('Just 'C) where
+  knownSumPathTree = Sum1PathTree
+
+instance
+  ( ('Just 'L) ~ WhereSum ('Sum2 l r) ('Sum1 tag sub)
+  , KnownSumPathTree tag l sub (WhereSum l ('Sum1 tag sub))
+  ) => KnownSumPathTree tag ('Sum2 l r) sub ('Just 'L) where
+  knownSumPathTree = Sum2LeftPathTree knownSumPathTree
+
+instance
+  ( ('Just 'R) ~ WhereSum ('Sum2 l r) ('Sum1 tag sub)
+  , KnownSumPathTree tag r sub (WhereSum r ('Sum1 tag sub))
+  ) => KnownSumPathTree tag ('Sum2 l r) sub ('Just 'R) where
+  knownSumPathTree = Sum2RightPathTree knownSumPathTree
+
+sumElem
+  :: forall tag sub tree
+  . ( KnownSumPathTree tag tree sub (WhereSum tree ('Sum1 tag sub))
+    , KnownSymbol tag )
+  => StructurePath ('StructSum tree) sub
+sumElem = SumPath (Proxy @tag) knownSumPathTree
+
+class (g ~ WhereProd tree ('Product1 tag sub))
+  => KnownProductPathTree (tag :: Symbol) (tree :: ProductTree) (sub :: Structure) (g :: Maybe Goto)where
+  knownProductPathTree :: ProductPathTree tag tree sub
+
+instance KnownProductPathTree tag ('Product1 tag s) s ('Just 'C) where
+  knownProductPathTree = Product1PathTree
+
+instance
+  ( ('Just 'L) ~ WhereProd ('Product2 l r) ('Product1 tag sub)
+  , KnownProductPathTree tag l sub (WhereProd l ('Product1 tag sub))
+  ) => KnownProductPathTree tag ('Product2 l r) sub ('Just 'L) where
+  knownProductPathTree = Product2LeftPathTree knownProductPathTree
+
+instance
+  ( ('Just 'R) ~ WhereProd ('Product2 l r) ('Product1 tag sub)
+  , KnownProductPathTree tag r sub (WhereProd r ('Product1 tag sub))
+  ) => KnownProductPathTree tag ('Product2 l r) sub ('Just 'R) where
+  knownProductPathTree = Product2RightPathTree knownProductPathTree
+
+prodElem
+  :: forall tag sub tree
+  . ( KnownProductPathTree tag tree sub (WhereProd tree ('Product1 tag sub))
+    , KnownSymbol tag
+    )
+  => StructurePath ('StructProduct tree) sub
+prodElem = ProductPath (Proxy @tag) knownProductPathTree
 
 -- Condition
 
@@ -75,11 +143,10 @@ infix 6 ==:
 infix 6 <>:
 
 like_regex
-  :: [RegexFlag]
-  -> StructureJsonValue r c ('JsonValueType n 'StringType)
+  :: StructureJsonValue r c ('JsonValueType n 'StringType)
   -> T.Text
   -> StructureCondition r c
-like_regex flags v t = StringCondition v (StringLikeRegex t flags)
+like_regex v t = StringCondition v (StringLikeRegex t [])
 
 infix 6 `like_regex`
 
@@ -135,9 +202,9 @@ instance JsonValueLiteral Null 'Nullable t where
 -- Render
 
 renderQuery
-  :: forall root ret
-  . (Structural root, Structural ret)
-  => StructureQuery (StructKind root) 'Nothing (StructKind ret)
+  :: forall (root :: *) (ret :: Structure)
+  . (Structural root)
+  => StructureQuery (StructKind root) 'Nothing ret
   -> TL.Text
 renderQuery q = TB.toLazyText $ Render.renderQuery q
 
