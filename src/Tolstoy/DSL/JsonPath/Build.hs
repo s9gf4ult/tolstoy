@@ -117,7 +117,7 @@ cExists = ExistsCondition
   :: StructureCondition r c
   -> StructureCondition r c
   -> StructureCondition r c
-(&&:) = error "FIXME: (&&:) not implemented"
+(&&:) = BoolCondition BoolAnd
 
 infixr 5 &&:
 
@@ -125,7 +125,7 @@ infixr 5 &&:
   :: StructureCondition r c
   -> StructureCondition r c
   -> StructureCondition r c
-(||:) = error "FIXME: (||:) not implemented"
+(||:) = BoolCondition BoolOr
 
 infixr 4 ||:
 
@@ -201,6 +201,99 @@ data Null = Null
 instance JsonValueLiteral Null 'Nullable t where
   lit _ = LiteralNullValue
 
+query
+  :: StructureQuery r c ret
+  -> StructureJsonValue r c (StructValueType ret)
+query = QueryValue
+
+(+:)
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+(+:) = NumberOperatorValue NumberPlus
+
+(-:)
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+(-:) = NumberOperatorValue NumberMinus
+
+(*:)
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+(*:) = NumberOperatorValue NumberMultiply
+
+(/:)
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+(/:) = NumberOperatorValue NumberDivide
+
+(%:)
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+(%:) = NumberOperatorValue NumberModulus
+
+typeOf
+  :: StructureJsonValue r c t
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
+typeOf = TypeOfValue
+
+sizeOf
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'ArrayType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+sizeOf = error "FIXME: sizeOf not implemented"
+
+stringToDouble
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+stringToDouble = StringToDouble
+
+ceiling
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+ceiling = NumberMethodValue NumberCeiling
+
+floor
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+floor = NumberMethodValue NumberFloor
+
+abs
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+abs = NumberMethodValue NumberAbs
+
+double
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+double = NumberMethodValue NumberDouble
+
+dotStar
+  :: StructureJsonValue r c ('JsonValueType 'Strict 'ObjectType)
+  -> StructureJsonValue r c ('JsonValueType 'Nullable t)
+dotStar = ObjectAnyFieldValue
+
+dotStarStar
+  :: Maybe IndexRange
+  -- ^ The level of nesting to traverse.
+  -> StructureJsonValue r c t1
+  -- ^ The value to nest in
+  -> StructureJsonValue r c ('JsonValueType 'Nullable t2)
+dotStarStar = RecursiveElementValue
+
+filterType
+  :: JsonValueTypeRep ret
+  -> StructureJsonValue r c t
+  -> StructureJsonValue r c ret
+filterType = FilterTypeValue
+
+filterStrict
+  :: StructureJsonValue r c ('JsonValueType n t)
+  -> StructureJsonValue r c ('JsonValueType 'Strict t)
+filterStrict = FilterStrictValue
 
 -- Render
 
