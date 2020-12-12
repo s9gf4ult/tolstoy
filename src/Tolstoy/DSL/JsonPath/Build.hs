@@ -129,19 +129,32 @@ infixr 5 &&:
 
 infixr 4 ||:
 
+class EqableType (t :: JsonType) where
+  eqable :: Eqable t
+instance EqableType 'StringType where
+  eqable = EqableString
+instance EqableType 'NumberType where
+  eqable = EqableNumber
+instance EqableType 'NullType where
+  eqable = EqableNull
+instance EqableType 'BooleanType where
+  eqable = EqableBoolean
+
 (==:)
-  :: StructureJsonValue r c ('JsonValueType n1 t)
+  :: (EqableType t)
+  => StructureJsonValue r c ('JsonValueType n1 t)
   -> StructureJsonValue r c ('JsonValueType n2 t)
   -> StructureCondition r c
-(==:) = error "FIXME: (==:) not implemented"
+(==:) = EqCondition eqable EqOperator
 
 infix 6 ==:
 
 (<>:)
-  :: StructureJsonValue r c ('JsonValueType n1 t)
+  :: (EqableType t)
+  => StructureJsonValue r c ('JsonValueType n1 t)
   -> StructureJsonValue r c ('JsonValueType n2 t)
   -> StructureCondition r c
-(<>:) = error "FIXME: (<>:) not implemented"
+(<>:) = EqCondition eqable NotEqOperator
 
 infix 6 <>:
 
@@ -200,6 +213,9 @@ data Null = Null
 
 instance JsonValueLiteral Null 'Nullable t where
   lit _ = LiteralNullValue
+
+textLit :: T.Text -> StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
+textLit = lit
 
 query
   :: StructureQuery r c ret

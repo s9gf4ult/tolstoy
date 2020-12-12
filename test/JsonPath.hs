@@ -22,4 +22,4 @@ instance Structural Sub
 
 t :: TL.Text
 t = renderQuery @Rec $ root ?:
-  (QueryValue (ctx .: prodElem @"sub" .: prodElem @"string") `like_regex` "regex")
+  (query (ctx .: prodElem @"sub" .: prodElem @"string") ==: textLit "hello")
