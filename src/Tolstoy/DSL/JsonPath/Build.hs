@@ -119,7 +119,7 @@ cExists = ExistsCondition
   -> StructureCondition r c
 (&&:) = BoolCondition BoolAnd
 
-infixr 5 &&:
+infixr 3 &&:
 
 (||:)
   :: StructureCondition r c
@@ -127,7 +127,7 @@ infixr 5 &&:
   -> StructureCondition r c
 (||:) = BoolCondition BoolOr
 
-infixr 4 ||:
+infixr 2 ||:
 
 class EqableType (t :: JsonType) where
   eqable :: Eqable t
@@ -147,7 +147,7 @@ instance EqableType 'BooleanType where
   -> StructureCondition r c
 (==:) = EqCondition eqable EqOperator
 
-infix 6 ==:
+infix 4 ==:
 
 (<>:)
   :: (EqableType t)
@@ -156,7 +156,7 @@ infix 6 ==:
   -> StructureCondition r c
 (<>:) = EqCondition eqable NotEqOperator
 
-infix 6 <>:
+infix 4 <>:
 
 like_regex
   :: StructureJsonValue r c ('JsonValueType n 'StringType)
@@ -164,7 +164,7 @@ like_regex
   -> StructureCondition r c
 like_regex v t = StringCondition v (StringLikeRegex t [])
 
-infix 6 `like_regex`
+infix 4 `like_regex`
 
 starts_with
   :: StructureJsonValue r c ('JsonValueType n 'StringType)
@@ -172,7 +172,7 @@ starts_with
   -> StructureCondition r c
 starts_with v t = StringCondition v (StringStartsWith t)
 
-infix 6 `starts_with`
+infix 4 `starts_with`
 
 (>:)
   :: StructureJsonValue r c ('JsonValueType n1 'NumberType)
@@ -180,11 +180,15 @@ infix 6 `starts_with`
   -> StructureCondition r c
 (>:) = NumberCompareCondition NumberLT
 
+infix 4 >:
+
 (>=:)
   :: StructureJsonValue r c ('JsonValueType n1 'NumberType)
   -> StructureJsonValue r c ('JsonValueType n2 'NumberType)
   -> StructureCondition r c
 (>=:) = NumberCompareCondition NumberLE
+
+infix 4 >=:
 
 (<:)
   :: StructureJsonValue r c ('JsonValueType n1 'NumberType)
@@ -192,11 +196,15 @@ infix 6 `starts_with`
   -> StructureCondition r c
 (<:) = NumberCompareCondition NumberGT
 
+infix 4 <:
+
 (<=:)
   :: StructureJsonValue r c ('JsonValueType n1 'NumberType)
   -> StructureJsonValue r c ('JsonValueType n2 'NumberType)
   -> StructureCondition r c
 (<=:) = NumberCompareCondition NumberGE
+
+infix 4 <=:
 
 -- Value
 
