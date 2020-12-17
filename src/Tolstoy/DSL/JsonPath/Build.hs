@@ -2,6 +2,7 @@
 
 module Tolstoy.DSL.JsonPath.Build where
 
+import           Data.Function
 import           Data.Proxy
 import           Data.Scientific
 import qualified Data.Text as T
@@ -33,7 +34,7 @@ infixl 7 ?:
   -> StructureQuery r c outer
 (.:) = QueryNesting
 
-infixl 8 .:
+infixl 7 .:
 
 -- Path
 
@@ -225,6 +226,9 @@ instance JsonValueLiteral Null 'Nullable t where
 textLit :: T.Text -> StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
 textLit = lit
 
+numLit :: Scientific -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+numLit = lit
+
 query
   :: StructureQuery r c ret
   -> StructureJsonValue r c (StructValueType ret)
@@ -236,11 +240,15 @@ query = QueryValue
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
 (+:) = NumberOperatorValue NumberPlus
 
+infixl 5 +:
+
 (-:)
   :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
 (-:) = NumberOperatorValue NumberMinus
+
+infixl 5 -:
 
 (*:)
   :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
@@ -248,17 +256,23 @@ query = QueryValue
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
 (*:) = NumberOperatorValue NumberMultiply
 
+infixl 6 *:
+
 (/:)
   :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
 (/:) = NumberOperatorValue NumberDivide
 
+infixl 6 /:
+
 (%:)
   :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
 (%:) = NumberOperatorValue NumberModulus
+
+infixl 6 %:
 
 typeOf
   :: StructureJsonValue r c t
@@ -268,7 +282,7 @@ typeOf = TypeOfValue
 sizeOf
   :: StructureJsonValue r c ('JsonValueType 'Strict 'ArrayType)
   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
-sizeOf = error "FIXME: sizeOf not implemented"
+sizeOf = SizeOfValue
 
 stringToDouble
   :: StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
@@ -318,6 +332,23 @@ filterStrict
   :: StructureJsonValue r c ('JsonValueType n t)
   -> StructureJsonValue r c ('JsonValueType 'Strict t)
 filterStrict = FilterStrictValue
+
+class ToStructureJsonValue a r c t | a -> r c t where
+  toStructureJsonValue :: a -> StructureJsonValue r c t
+instance ToStructureJsonValue (StructureJsonValue r c t) r c t where
+  toStructureJsonValue = id
+instance (t ~ (StructValueType ret))
+  => ToStructureJsonValue (StructureQuery r c ret) r c t where
+  toStructureJsonValue = query
+
+(&:)
+  :: (ToStructureJsonValue a r c t)
+  => a
+  -> (StructureJsonValue r c t -> StructureJsonValue r c t2)
+  -> StructureJsonValue r c t2
+(&:) a f = f (toStructureJsonValue a)
+
+infixl 7 &:
 
 -- Render
 
