@@ -19,6 +19,8 @@ data StructureRep :: Structure -> * where
   SumRep      :: !(SumTreeRep t) -> StructureRep (StructSum t)
   ProductRep  :: !(ProductTreeRep t) -> StructureRep (StructProduct t)
 
+deriving instance Show (StructureRep s)
+
 data SumTreeRep :: SumTree -> * where
   Sum1Rep
     :: (KnownSymbol t)
@@ -29,6 +31,8 @@ data SumTreeRep :: SumTree -> * where
     :: !(SumTreeRep t1)
     -> !(SumTreeRep t2)
     -> SumTreeRep ('Sum2 t1 t2)
+
+deriving instance Show (SumTreeRep s)
 
 data ProductTreeRep :: ProductTree -> * where
   Product0Rep :: ProductTreeRep 'Product0
@@ -41,6 +45,8 @@ data ProductTreeRep :: ProductTree -> * where
     :: !(ProductTreeRep t1)
     -> !(ProductTreeRep t2)
     -> ProductTreeRep ('Product2 t1 t2)
+
+deriving instance Show (ProductTreeRep p)
 
 instance ToJSON (StructureRep s) where
   toJSON s = object $ mconcat

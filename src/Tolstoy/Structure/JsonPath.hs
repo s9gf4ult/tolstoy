@@ -7,6 +7,7 @@ import qualified Data.Text as T
 import           GHC.Generics (Generic)
 import           GHC.TypeLits
 import           Tolstoy.Structure.Kind
+import           Tolstoy.Structure.Rep
 
 data StructureQuery
   :: Structure
@@ -22,24 +23,75 @@ data StructureQuery
   -- | The "@" query.
   QueryContext :: StructureQuery r ('Just c) c
   QueryFilter
-    :: StructureQuery r c ret
-    -- ^ Query before the filter
-    -> StructureCondition r ('Just ret)
+    :: StructureCondition r ('Just ret)
     -- ^ The filter conditon. Return type of previous query becomes
     -- context of the condition
     -> StructureQuery r c ret
+    -- ^ Query before the filter
+    -> StructureQuery r c ret
     -- ^ When we exit the filter context doesn't change.
-  QueryNesting
+  QueryPath
     :: ( Show (StructureQuery r c inner)
        , Show (StructurePath inner outer)
        )
-    => StructureQuery r c inner
-    -- ^ Query before the filter
-    -> StructurePath inner outer
+    => StructurePath inner outer
     -- ^ Path inside of the
+    -> StructureQuery r c inner
+    -- ^ Query before the filter
     -> StructureQuery r c outer
+  QueryLiteral
+    :: Literal ret
+    -> StructureQuery r c ret
+  QueryNumberOperator
+    :: NumberOperator
+    -> StructureQuery r c 'StructNumber
+    -> StructureQuery r c 'StructNumber
+    -> StructureQuery r c 'StructNumber
+  QueryMethodCall
+    :: MethodCall inner ret
+    -> StructureQuery r c inner
+    -> StructureQuery r c ret
+  QueryAnyField
+    :: StructureRep ret
+    -> AnyField inner
+    -> StructureQuery r c inner
+    -> StructureQuery r c ret
+  QueryRecursiveAnyField
+    :: StructureRep ret
+    -> StructureQuery r c inner
+    -> StructureQuery r c ret
 
 deriving instance Show (StructureQuery r c ret)
+
+data AnyField :: Structure -> * where
+  ProdAnyField :: AnyField ('StructProduct p)
+  SumAnyField :: AnyField ('StructSum s)
+
+deriving instance Show (AnyField s)
+
+data Literal :: Structure -> * where
+  LiteralString :: Text -> Literal 'StructString
+  LiteralNumber :: Scientific -> Literal 'StructNumber
+  LiteralBool :: Bool -> Literal 'StructBool
+  LiteralNull :: Literal ('StructOptional t)
+
+deriving instance Show (Literal s)
+
+data MethodCall :: Structure -> Structure -> * where
+  CallType :: MethodCall t 'StructString
+  CallSize :: MethodCall ('StructVector sub) 'StructNumber
+  CallDouble :: DoubleCompat t -> MethodCall t 'StructNumber
+  CallNumberMethod :: NumberMethod -> MethodCall 'StructNumber 'StructNumber
+
+
+deriving instance Show (MethodCall a b)
+
+data DoubleCompat :: Structure -> * where
+  DoubleNumber :: DoubleCompat 'StructNumber
+  DoubleString :: DoubleCompat 'StructString
+
+deriving instance Show (DoubleCompat a)
+
 
 -- | The path inside some structure. First argument is the structure
 -- to query on. The second is the structure the path returns.
@@ -141,21 +193,21 @@ data StructureCondition
   -- objects it always returns "null", on arrays it returns
   -- "false". It always returns "false" on two different types
   EqCondition
-    :: Eqable t
+    :: Eqable s
     -> EqOperator
-    -> StructureJsonValue r c ('JsonValueType n1 t)
-    -> StructureJsonValue r c ('JsonValueType n2 t)
+    -> StructureQuery r c s
+    -> StructureQuery r c s
     -> StructureCondition r c
   -- | "like_regex" or "starts with". Returns null on null input.
   StringCondition
-    :: StructureJsonValue r c ('JsonValueType n 'StringType)
+    :: StructureQuery r c 'StructString
     -> StringChecker
     -> StructureCondition r c
   -- | 2 > 3. Returns false if any of arguments is null.
   NumberCompareCondition
     :: NumberCompare
-    -> StructureJsonValue r c ('JsonValueType n1 'NumberType)
-    -> StructureJsonValue r c ('JsonValueType n2 'NumberType)
+    -> StructureQuery r c 'StructNumber
+    -> StructureQuery r c 'StructNumber
     -> StructureCondition r c
 
 deriving instance Show (StructureCondition r c)
@@ -164,105 +216,111 @@ data EqOperator = EqOperator | NotEqOperator
   deriving (Eq, Ord, Show, Generic)
 
 -- | Restriction of types for "==" operator
-data Eqable :: JsonType -> * where
-  EqableString :: Eqable 'StringType
-  EqableNumber :: Eqable 'NumberType
-  EqableNull :: Eqable 'NullType
-  EqableBoolean :: Eqable 'BooleanType
+data Eqable :: Structure -> * where
+  EqableString :: Eqable 'StructString
+  EqableNumber :: Eqable 'StructNumber
+  EqableBoolean :: Eqable 'StructBool
+  EqableOpt :: Eqable sub -> Eqable ('StructOptional sub)
 
 deriving instance Show (Eqable t)
 
--- | Values can be constructed from simple path, but also with some
--- operators and methods. Values can be strict and optional. Optional
--- value can be either null or some other value. Strict value can not
--- be null.
-data StructureJsonValue
-  :: Structure
-  -- ^ Root
-  -> Maybe Structure
-  -- ^ Context if available
-  -> JsonValueType
-  -> * where
-  LiteralStringValue
-    :: Text
-    -> StructureJsonValue r c ('JsonValueType n 'StringType)
-  LiteralNumberValue
-    :: Scientific
-    -> StructureJsonValue r c ('JsonValueType n 'NumberType)
-  LiteralBoolValue
-    :: Bool
-    -> StructureJsonValue r c ('JsonValueType n 'BooleanType)
-  -- | null is the nullable value of any type. Deal with it.
-  LiteralNullValue :: StructureJsonValue r c ('JsonValueType 'Nullable t)
-  -- | Some path value, like "$.a[*].b"
-  QueryValue
-    :: StructureQuery r c ret
-    -> StructureJsonValue r c (StructValueType ret)
-  -- | Two numbers can be combined with one of operators, like "3 + 4"
-  -- is also a number. All operators fail on null.
-  NumberOperatorValue
-    :: NumberOperator
-    -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
-    -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
-    -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
-  -- | Call the ".type()" jsonpath function. It always returns the
-  -- string on any input value
-  TypeOfValue
-    :: StructureJsonValue r c t
-    -> StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
-  -- | Call the ".size()" jsonpath function. Anways returns
-  -- number. The "size" always returns 1 on any non-array value. So we
-  -- decline nulls to avoid this weird silent behaviour.
-  SizeOfValue
-    :: StructureJsonValue r c ('JsonValueType 'Strict 'ArrayType)
-    -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
-  -- | Call the ".double()" jsonpath method. Accepts only string or
-  -- number. But there is constructor is only for strings. "double"
-  -- fails on null so the string must be strict
-  StringToDouble
-    :: StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
-    -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
-  -- | Calls one of the number methods. Accepts number only. All
-  -- methods fail if null occured, so it requires strict number
-  NumberMethodValue
-    :: NumberMethod
-    -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
-    -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
-  -- | Selects any field from object.  The ".*" operator.  Returns
-  -- literally any value.  Fails on nulls.  The constructor is not
-  -- StructurePath because we loose the type of the inner structure.
-  -- But we don't want to build untypeable paths. Nullability is set
-  -- by default, because we can not guarantee, that there are no nulls
-  -- inside of the object.
-  ObjectAnyFieldValue
-    :: StructureJsonValue r c ('JsonValueType 'Strict 'ObjectType)
-    -- ^ The object to nest in
-    -> StructureJsonValue r c ('JsonValueType 'Nullable t)
-  -- | Selects any field from object, or any element from array with
-  -- optional depth. Works with any type, even with null. Returns
-  -- literally any type. The constructor is not StructurePath because
-  -- we loose the type of the inner structure. But we don't want to
-  -- build untypeable paths. Nullability is set by default, because we
-  -- can not guarantee, that there are no nulls inside of the value.
-  RecursiveElementValue
-    :: Maybe IndexRange
-    -- ^ The level of nesting to traverse.
-    -> StructureJsonValue r c t1
-    -- ^ The value to nest in
-    -> StructureJsonValue r c ('JsonValueType 'Nullable t2)
-  -- | Filter any unknown types to specified one. Generates '?
-  -- (@.type() == "string"' for strings for example. Also passess
-  -- nulls like '? (@ == null || @.type() == "number")'
-  FilterTypeValue
-    :: JsonValueTypeRep ret
-    -> StructureJsonValue r c t
-    -> StructureJsonValue r c ret
-  -- | ? (@ <> null)
-  FilterStrictValue
-    :: StructureJsonValue r c ('JsonValueType n t)
-    -> StructureJsonValue r c ('JsonValueType 'Strict t)
+-- -- | Values can be constructed from simple path, but also with some
+-- -- operators and methods. Values can be strict and optional. Optional
+-- -- value can be either null or some other value. Strict value can not
+-- -- be null.
+-- data StructureJsonValue
+--   :: Structure
+--   -- ^ Root
+--   -> Maybe Structure
+--   -- ^ Context if available
+--   -> JsonValueType
+--   -> * where
+  -- LiteralStringValue
+  --   :: Text
+  --   -> StructureJsonValue r c ('JsonValueType n 'StringType)
+  -- LiteralNumberValue
+  --   :: Scientific
+  --   -> StructureJsonValue r c ('JsonValueType n 'NumberType)
+  -- LiteralBoolValue
+  --   :: Bool
+  --   -> StructureJsonValue r c ('JsonValueType n 'BooleanType)
+  -- -- | null is the nullable value of any type. Deal with it.
+  -- LiteralNullValue :: StructureJsonValue r c ('JsonValueType 'Nullable t)
 
-deriving instance Show (StructureJsonValue r c t)
+  -- -- | Some path value, like "$.a[*].b"
+  -- QueryValue
+  --   :: StructureQuery r c ret
+  --   -> StructureJsonValue r c (StructValueType ret)
+
+  -- -- | Two numbers can be combined with one of operators, like "3 + 4"
+  -- -- is also a number. All operators fail on null.
+  -- NumberOperatorValue
+  --   :: NumberOperator
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+
+  -- -- | Call the ".type()" jsonpath function. It always returns the
+  -- -- string on any input value
+  -- TypeOfValue
+  --   :: StructureJsonValue r c t
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
+  -- -- | Call the ".size()" jsonpath function. Anways returns
+  -- -- number. The "size" always returns 1 on any non-array value. So we
+  -- -- decline nulls to avoid this weird silent behaviour.
+  -- SizeOfValue
+  --   :: StructureJsonValue r c ('JsonValueType 'Strict 'ArrayType)
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -- -- | Call the ".double()" jsonpath method. Accepts only string or
+  -- -- number. But there is constructor is only for strings. "double"
+  -- -- fails on null so the string must be strict
+  -- StringToDouble
+  --   :: StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  -- -- | Calls one of the number methods. Accepts number only. All
+  -- -- methods fail if null occured, so it requires strict number
+  -- NumberMethodValue
+  --   :: NumberMethod
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
+
+  -- -- | Selects any field from object.  The ".*" operator.  Returns
+  -- -- literally any value.  Fails on nulls.  The constructor is not
+  -- -- StructurePath because we loose the type of the inner structure.
+  -- -- But we don't want to build untypeable paths. Nullability is set
+  -- -- by default, because we can not guarantee, that there are no nulls
+  -- -- inside of the object.
+  -- ObjectAnyFieldValue
+  --   :: StructureJsonValue r c ('JsonValueType 'Strict 'ObjectType)
+  --   -- ^ The object to nest in
+  --   -> StructureJsonValue r c ('JsonValueType 'Nullable t)
+
+  -- -- | Selects any field from object, or any element from array with
+  -- -- optional depth. Works with any type, even with null. Returns
+  -- -- literally any type. The constructor is not StructurePath because
+  -- -- we loose the type of the inner structure. But we don't want to
+  -- -- build untypeable paths. Nullability is set by default, because we
+  -- -- can not guarantee, that there are no nulls inside of the value.
+  -- RecursiveElementValue
+  --   :: Maybe IndexRange
+  --   -- ^ The level of nesting to traverse.
+  --   -> StructureJsonValue r c t1
+  --   -- ^ The value to nest in
+  --   -> StructureJsonValue r c ('JsonValueType 'Nullable t2)
+
+  -- -- | Filter any unknown types to specified one. Generates '?
+  -- -- (@.type() == "string"' for strings for example. Also passess
+  -- -- nulls like '? (@ == null || @.type() == "number")'
+  -- FilterTypeValue
+  --   :: JsonValueTypeRep ret
+  --   -> StructureJsonValue r c t
+  --   -> StructureJsonValue r c ret
+  -- -- | ? (@ <> null)
+  -- FilterStrictValue
+  --   :: StructureJsonValue r c ('JsonValueType n t)
+  --   -> StructureJsonValue r c ('JsonValueType 'Strict t)
+
+-- deriving instance Show (StructureJsonValue r c t)
 
 data NumberMethod
   = NumberCeiling
@@ -271,8 +329,6 @@ data NumberMethod
   -- ^ ".floor()" method
   | NumberAbs
   -- ^ ".abs()" method
-  | NumberDouble
-  -- ^ ".double()" method for numbers
   deriving (Eq, Ord, Show, Generic)
 
 type family StructType (s :: Structure) :: JsonType where
