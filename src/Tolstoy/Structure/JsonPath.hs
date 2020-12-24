@@ -1,13 +1,12 @@
 module Tolstoy.Structure.JsonPath where
 
-import           Data.Proxy
-import           Data.Scientific
-import           Data.Text (Text)
-import qualified Data.Text as T
-import           GHC.Generics (Generic)
-import           GHC.TypeLits
-import           Tolstoy.Structure.Kind
-import           Tolstoy.Structure.Rep
+import Data.Proxy
+import Data.Scientific
+import Data.Text (Text)
+import GHC.Generics (Generic)
+import GHC.TypeLits
+import Tolstoy.Structure.Kind
+import Tolstoy.Structure.Rep
 
 data StructureQuery
   :: Structure
@@ -332,13 +331,13 @@ data NumberMethod
   deriving (Eq, Ord, Show, Generic)
 
 type family StructType (s :: Structure) :: JsonType where
-  StructType StructString = 'StringType
-  StructType StructNumber = 'NumberType
-  StructType StructBool = 'BooleanType
-  StructType (StructOptional s) = StructType s
-  StructType (StructVector s) = 'ArrayType
-  StructType (StructSum s) = 'ObjectType
-  StructType (StructProduct s) = 'ObjectType
+  StructType 'StructString = 'StringType
+  StructType 'StructNumber = 'NumberType
+  StructType 'StructBool = 'BooleanType
+  StructType ('StructOptional s) = StructType s
+  StructType ('StructVector s) = 'ArrayType
+  StructType ('StructSum s) = 'ObjectType
+  StructType ('StructProduct s) = 'ObjectType
 
 type family StructValueType (s :: Structure) :: JsonValueType where
   StructValueType ('StructOptional s) = 'JsonValueType 'Nullable (StructType s)
