@@ -3,8 +3,6 @@ module Tolstoy.DSL.JsonPath.Render
   , renderCondition
   ) where
 
-import           Data.Foldable
-import           Data.Functor
 import qualified Data.List as L
 import           Data.String
 import           Data.Text (Text)
@@ -13,6 +11,7 @@ import           Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as TB
 import           GHC.TypeLits
 import           Tolstoy.Structure.JsonPath
+import           Tolstoy.Structure.Rep
 
 renderQuery :: StructureQuery r c ret -> Builder
 renderQuery = \case
@@ -29,8 +28,36 @@ renderQuery = \case
     , renderNumberOperator op
     , renderQuery b
     ]
-  QueryMethodCall mc q -> mconcat $ interspace
-    [ ]
+  QueryMethodCall mc q -> renderQuery q <> renderMethodCall mc
+  QueryAnyField rep _af q -> mconcat
+    [ renderQuery q
+    , ".*"
+    , renderTypeFilter rep ]
+  QueryRecursiveAnyField rep idx q -> mconcat
+    [ renderQuery q
+    , ".**"
+    , maybe mempty renderRecursiveDepth idx
+    , renderTypeFilter rep ]
+
+renderTypeFilter :: StructureRep a -> Builder
+renderTypeFilter rep = " ? " <> wrapBrackets (typeFilter rep)
+  where
+    typeFilter = \case
+      OptionalRep sub -> "@ == null || " <> typeFilterStrict sub
+      other -> typeFilterStrict other
+    typeFilterStrict :: StructureRep x -> Builder
+    typeFilterStrict = \case
+      OptionalRep sub -> typeFilterStrict sub
+      StringRep -> typeIs "string"
+      NumberRep -> typeIs "number"
+      BoolRep -> typeIs "boolean"
+      VectorRep _ -> typeIs "array"
+      SumRep _ -> typeIs "object"
+      ProductRep _ -> typeIs "object"
+    typeIs t = "@.type() == " <> quoteText t
+
+renderRecursiveDepth :: IndexRange -> Builder
+renderRecursiveDepth ind = "{" <> renderIndexRange ind <> "}"
 
 renderLiteral :: Literal s -> Builder
 renderLiteral = \case
@@ -89,97 +116,48 @@ renderProductPath tagName = \case
   Product2RightPathTree r -> renderProductPath tagName r
 
 renderCondition :: StructureCondition r c -> Builder
-renderCondition = (error "FIXME: not implemented")
-  -- \case
-  -- NotCondition cond -> "!(" <> renderCond cond <> ")"
-  -- ExistsCondition cond -> "exists(" <> renderCond cond <> ")"
-  -- BoolCondition op a b -> mconcat $ interspace
-  --   [ wrapBrackets $ renderCond a
-  --   , renderBoolOperator op
-  --   , wrapBrackets $ renderCond b ]
-  -- EqCondition _ op a b -> mconcat $ interspace
-  --   [ wrapBrackets $ renderValue a
-  --   , renderEqOperator op
-  --   , wrapBrackets $ renderValue b ]
-  -- StringCondition v check -> mconcat $ interspace
-  --   [ wrapBrackets $ renderValue v
-  --   , renderStringChecker check ]
-  -- NumberCompareCondition op a b -> mconcat $ interspace
-  --   [ wrapBrackets $ renderValue a
-  --   , renderNumberCompare op
-  --   , wrapBrackets $ renderValue b ]
+renderCondition = \case
+  NotCondition cond -> "!(" <> renderCondition cond <> ")"
+  ExistsCondition cond -> "exists(" <> renderCondition cond <> ")"
+  BoolCondition op a b -> mconcat $ interspace
+    [ wrapBrackets $ renderCondition a
+    , renderBoolOperator op
+    , wrapBrackets $ renderCondition b ]
+  EqCondition _ op a b -> mconcat $ interspace
+    [ wrapBrackets $ renderQuery a
+    , renderEqOperator op
+    , wrapBrackets $ renderQuery b ]
+  StringCondition v check -> mconcat $ interspace
+    [ wrapBrackets $ renderQuery v
+    , renderStringChecker check ]
+  NumberCompareCondition op a b -> mconcat $ interspace
+    [ wrapBrackets $ renderQuery a
+    , renderNumberCompare op
+    , wrapBrackets $ renderQuery b ]
 
--- renderStringChecker :: StringChecker -> Builder
--- renderStringChecker = \case
---   StringStartsWith t -> "starts with " <> quoteText t
---   StringLikeRegex r flist -> "like_regex " <> quoteText r <> flags
---     where
---       flags = case flist of
---         [] -> mempty
---         _  -> " flags " <> quoteText flagsText
---       flagsText = T.pack $ renderFlag <$> flist
+renderStringChecker :: StringChecker -> Builder
+renderStringChecker = \case
+  StringStartsWith t -> "starts with " <> quoteText t
+  StringLikeRegex r flist -> "like_regex " <> quoteText r <> flags
+    where
+      flags = case flist of
+        [] -> mempty
+        _  -> " flags " <> quoteText flagsText
+      flagsText = T.pack $ renderFlag <$> flist
 
--- renderFlag :: RegexFlag -> Char
--- renderFlag = \case
---   RegexIFlag -> 'i'
---   RegexMFlag -> 'm'
---   RegexSFlag -> 's'
---   RegexQFlag -> 'q'
+renderFlag :: RegexFlag -> Char
+renderFlag = \case
+  RegexIFlag -> 'i'
+  RegexMFlag -> 'm'
+  RegexSFlag -> 's'
+  RegexQFlag -> 'q'
 
--- renderNumberCompare :: NumberCompare -> Builder
--- renderNumberCompare = \case
---   NumberLT -> "<"
---   NumberLE -> "<="
---   NumberGT -> ">"
---   NumberGE -> ">="
-
--- renderValue :: StructureJsonValue r c t -> Builder
--- renderValue = \case
---   LiteralStringValue t -> quoteText t
---   LiteralNumberValue n -> fromString $ show n
---   LiteralBoolValue b -> case b of
---     True  -> "true"
---     False -> "false"
---   LiteralNullValue -> "null"
---   QueryValue q -> renderQuery q
---   NumberOperatorValue op a b -> mconcat $ interspace
---     [ wrapBrackets $ renderValue a
---     , renderNumberOperator op
---     , wrapBrackets $ renderValue b ]
---   TypeOfValue v ->  wrapBrackets (renderValue v) <> ".type()"
---   SizeOfValue v -> wrapBrackets (renderValue v) <> ".size()"
---   StringToDouble v -> wrapBrackets (renderValue v) <> ".double()"
---   NumberMethodValue m v -> wrapBrackets (renderValue v) <> renderNumberMethod m
---   ObjectAnyFieldValue v -> wrapBrackets (renderValue v) <> ".*"
---   RecursiveElementValue mind v -> wrapBrackets (renderValue v) <> ".**" <> deep
---     where
---       deep :: Builder
---       deep = fold $ mind <&> \ind ->
---         "{" <> renderIndexRange ind <> "}"
---   FilterTypeValue rep val -> mconcat $ interspace
---     [ wrapBrackets $ renderValue val
---     , "?"
---     , wrapBrackets filterRep ]
---     where
---       filterRep = case rep of
---         JsonValueTypeRep n t -> case concat [ nullable, types ] of
---           [cond] -> cond
---           conds  -> mconcat $ L.intersperse " || " $ wrapBrackets <$> conds
---           where
---             nullable = case n of
---               NullableRep -> [ "@ == null" ]
---               StrictRep   -> []
---             types =
---               let
---                 tt = quoteText $ case t of
---                   StringTypeRep  -> "string"
---                   NumberTypeRep  -> "number"
---                   ObjectTypeRep  -> "object"
---                   ArrayTypeRep   -> "array"
---                   NullTypeRep    -> "null"
---                   BooleanTypeRep -> "boolean"
---               in [ "@.type() == " <> tt ]
---   FilterStrictValue v -> wrapBrackets (renderValue v) <> " ? (@ <> null)"
+renderNumberCompare :: NumberCompare -> Builder
+renderNumberCompare = \case
+  NumberLT -> "<"
+  NumberLE -> "<="
+  NumberGT -> ">"
+  NumberGE -> ">="
 
 renderNumberOperator :: NumberOperator -> Builder
 renderNumberOperator = \case
@@ -188,6 +166,13 @@ renderNumberOperator = \case
   NumberMultiply -> "*"
   NumberDivide -> "/"
   NumberModulus -> "%"
+
+renderMethodCall :: MethodCall a b -> Builder
+renderMethodCall = \case
+  CallType -> ".type()"
+  CallSize -> ".size()"
+  CallDouble _dc -> ".double()"
+  CallNumberMethod nm -> renderNumberMethod nm
 
 renderNumberMethod :: NumberMethod -> Builder
 renderNumberMethod = \case
