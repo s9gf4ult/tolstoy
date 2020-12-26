@@ -124,11 +124,11 @@ renderCondition = \case
     , renderBoolOperator op
     , wrapBrackets $ renderCondition b ]
   EqCondition _ op a b -> mconcat $ interspace
-    [ wrapBrackets $ renderQuery a
+    [ renderQuery a
     , renderEqOperator op
-    , wrapBrackets $ renderQuery b ]
+    , renderQuery b ]
   StringCondition v check -> mconcat $ interspace
-    [ wrapBrackets $ renderQuery v
+    [ renderQuery v
     , renderStringChecker check ]
   NumberCompareCondition op a b -> mconcat $ interspace
     [ wrapBrackets $ renderQuery a
