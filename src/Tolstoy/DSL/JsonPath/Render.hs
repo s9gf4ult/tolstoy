@@ -15,62 +15,78 @@ import           GHC.TypeLits
 import           Tolstoy.Structure.JsonPath
 
 renderQuery :: StructureQuery r c ret -> Builder
-renderQuery = (error "FIXME: not implemented")
-  -- \case
-  -- QueryRoot -> "$"
-  -- QueryContext -> "@"
-  -- QueryFilter q cond -> mconcat $ interspace $
-  --   [ renderQuery q
-  --   , "?"
-  --   , wrapBrackets $ renderCond cond ]
-  -- QueryNesting q p -> renderQuery q <> renderJsonPath p
+renderQuery = \case
+  QueryRoot -> "$"
+  QueryContext -> "@"
+  QueryFilter cond q -> mconcat $ interspace
+    [ renderQuery q
+    , "?"
+    , wrapBrackets $ renderCondition cond ]
+  QueryPath p q -> renderQuery q <> renderJsonPath p
+  QueryLiteral lit -> renderLiteral lit
+  QueryNumberOperator op a b -> mconcat $ interspace
+    [ renderQuery a
+    , renderNumberOperator op
+    , renderQuery b
+    ]
+  QueryMethodCall mc q -> mconcat $ interspace
+    [ ]
 
--- renderJsonPath :: StructurePath s1 s2 -> Builder
--- renderJsonPath = \case
---   OptionalPath -> " ? (@ <> null)"
---   VectorPath vind -> "[" <> renderVectorIndex vind <> "]"
---   SumPath tag sumPath -> renderSumPath tagName sumPath
---     where
---       tagName = T.pack $ symbolVal tag
---   ProductPath tag prodPath -> renderProductPath tagName prodPath
---     where
---       tagName = T.pack $ symbolVal tag
+renderLiteral :: Literal s -> Builder
+renderLiteral = \case
+  LiteralString t -> quoteText t
+  LiteralNumber num -> fromString $ show num
+  LiteralBool b -> case b of
+    True  -> "true"
+    False -> "false"
+  LiteralNull -> "null"
 
--- renderVectorIndex :: VectorIndex -> Builder
--- renderVectorIndex = \case
---   VectorAny     -> "*"
---   VectorRange r -> renderIndexRange r
+renderJsonPath :: StructurePath s1 s2 -> Builder
+renderJsonPath = \case
+  OptionalPath -> " ? (@ <> null)"
+  VectorPath vind -> "[" <> renderVectorIndex vind <> "]"
+  SumPath tag sumPath -> renderSumPath tagName sumPath
+    where
+      tagName = T.pack $ symbolVal tag
+  ProductPath tag prodPath -> renderProductPath tagName prodPath
+    where
+      tagName = T.pack $ symbolVal tag
 
--- renderIndexRange :: IndexRange -> Builder
--- renderIndexRange = \case
---   IndexExact v   -> fromString $ show v
---   IndexRange a b -> fromString $ show a <> " to " <> show b
+renderVectorIndex :: VectorIndex -> Builder
+renderVectorIndex = \case
+  VectorAny     -> "*"
+  VectorRange r -> renderIndexRange r
 
--- quoteText :: Text -> Builder
--- quoteText t = TB.singleton '"' <> b <> TB.singleton '"'
---   where
---     b = fromString $ T.unpack t >>= f
---     f = \case
---       '"' -> "\""
---       c   -> [c]
+renderIndexRange :: IndexRange -> Builder
+renderIndexRange = \case
+  IndexExact v   -> fromString $ show v
+  IndexRange a b -> fromString $ show a <> " to " <> show b
 
--- wrapBrackets :: Builder -> Builder
--- wrapBrackets a = "(" <> a <> ")"
+quoteText :: Text -> Builder
+quoteText t = TB.singleton '"' <> b <> TB.singleton '"'
+  where
+    b = fromString $ T.unpack t >>= f
+    f = \case
+      '"' -> "\""
+      c   -> [c]
 
--- interspace :: [Builder] -> [Builder]
--- interspace = L.intersperse $ TB.singleton ' '
+interspace :: [Builder] -> [Builder]
+interspace = L.intersperse $ TB.singleton ' '
 
--- renderSumPath :: Text -> SumPathTree tag s sub -> Builder
--- renderSumPath tagName = \case
---   Sum1PathTree -> " ? (@.tag == " <> quoteText tagName <> ").value"
---   Sum2LeftPathTree l -> renderSumPath tagName l
---   Sum2RightPathTree r -> renderSumPath tagName r
+wrapBrackets :: Builder -> Builder
+wrapBrackets a = "(" <> a <> ")"
 
--- renderProductPath :: Text -> ProductPathTree tag s sub -> Builder
--- renderProductPath tagName = \case
---   Product1PathTree -> "." <> quoteText tagName
---   Product2LeftPathTree l -> renderProductPath tagName l
---   Product2RightPathTree r -> renderProductPath tagName r
+renderSumPath :: Text -> SumPathTree tag s sub -> Builder
+renderSumPath tagName = \case
+  Sum1PathTree -> " ? (@.tag == " <> quoteText tagName <> ").value"
+  Sum2LeftPathTree l -> renderSumPath tagName l
+  Sum2RightPathTree r -> renderSumPath tagName r
+
+renderProductPath :: Text -> ProductPathTree tag s sub -> Builder
+renderProductPath tagName = \case
+  Product1PathTree -> "." <> quoteText tagName
+  Product2LeftPathTree l -> renderProductPath tagName l
+  Product2RightPathTree r -> renderProductPath tagName r
 
 renderCondition :: StructureCondition r c -> Builder
 renderCondition = (error "FIXME: not implemented")

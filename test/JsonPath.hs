@@ -9,6 +9,7 @@ import           Tolstoy.Structure
 data Rec = Rec
   { string :: Text
   , sub    :: Sub
+  , int    :: Int
   } deriving (Eq, Ord, Show, Generic)
 
 instance Structural Rec
@@ -34,3 +35,8 @@ t3 = renderQuery @Rec $ root ?:
 t2 :: TL.Text
 t2 = renderQuery @[Rec] $ root .: vectorAny ?:
   (ctx .: prodElem @"string" .: dotDouble ==: numLit 10)
+
+t4 :: TL.Text
+t4 = renderQuery @Rec
+  $  root .: prodElem @"int"
+  +: root .: prodElem @"sub" .: prodElem @"int"
