@@ -5,6 +5,7 @@ module Tolstoy.DSL.JsonPath.Build where
 import           Data.Function
 import           Data.Proxy
 import           Data.Scientific
+import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
@@ -39,7 +40,7 @@ infixl 7 .:
 -- Query Path
 
 optional :: StructureQuery r c ('StructOptional s) -> StructureQuery r c s
-optional q = QueryPath OptionalPath
+optional = QueryPath OptionalPath
 
 vectorAny :: StructureQuery r c ('StructVector s) -> StructureQuery r c s
 vectorAny = QueryPath $ VectorPath VectorAny
@@ -203,19 +204,35 @@ dotAbs
   -> StructureQuery r c 'StructNumber
 dotAbs = QueryMethodCall $ CallNumberMethod NumberAbs
 
-dotStar
-  :: ()
-    StructureQuery r c any
-  -> StructureQuery r c ret
-dotStar = ObjectAnyFieldValue
+class AnyFieldClass (s :: Structure) where
+  anyField :: AnyField s
+instance AnyFieldClass ('StructProduct p) where
+  anyField = ProdAnyField
+instance AnyFieldClass ('StructSum s) where
+  anyField = SumAnyField
 
-dotStarStar
-  :: Maybe IndexRange
-  -- ^ The level of nesting to traverse.
-  -> StructureJsonValue r c t1
-  -- ^ The value to nest in
-  -> StructureJsonValue r c ('JsonValueType 'Nullable t2)
-dotStarStar = RecursiveElementValue
+objAny
+  :: forall ret any r c
+  .  (KnownStructure (StructKind ret), AnyFieldClass any)
+  => StructureQuery r c any
+  -> StructureQuery r c (StructKind ret)
+objAny = QueryAnyField structureRep anyField
+
+anyRecur
+  :: forall ret inner r c
+  . (KnownStructure (StructKind ret))
+  => Maybe IndexRange
+  -> StructureQuery r c inner
+  -> StructureQuery r c (StructKind ret)
+anyRecur = QueryRecursiveAnyField structureRep
+
+-- dotStarStar
+--   :: Maybe IndexRange
+--   -- ^ The level of nesting to traverse.
+--   -> StructureQuery r c any
+--   -- ^ The value to nest in
+--   -> StructureJsonValue r c ('JsonValueType 'Nullable t2)
+-- dotStarStar = RecursiveElementValue
 
 
 -- Condition
@@ -242,78 +259,78 @@ infixr 3 &&:
 
 infixr 2 ||:
 
-class EqableType (t :: JsonType) where
+class EqableClass (t :: Structure) where
   eqable :: Eqable t
-instance EqableType 'StringType where
+instance EqableClass 'StructString where
   eqable = EqableString
-instance EqableType 'NumberType where
+instance EqableClass 'StructNumber where
   eqable = EqableNumber
-instance EqableType 'NullType where
-  eqable = EqableNull
-instance EqableType 'BooleanType where
+instance EqableClass 'StructBool where
   eqable = EqableBoolean
+instance (EqableClass sub) => EqableClass ('StructOptional sub) where
+  eqable = EqableOpt eqable
 
 (==:)
-  :: (EqableType t)
-  => StructureJsonValue r c ('JsonValueType n1 t)
-  -> StructureJsonValue r c ('JsonValueType n2 t)
+  :: (EqableClass t)
+  => StructureQuery r c t
+  -> StructureQuery r c t
   -> StructureCondition r c
 (==:) = EqCondition eqable EqOperator
 
 infix 4 ==:
 
 (<>:)
-  :: (EqableType t)
-  => StructureJsonValue r c ('JsonValueType n1 t)
-  -> StructureJsonValue r c ('JsonValueType n2 t)
+  :: (EqableClass t)
+  => StructureQuery r c t
+  -> StructureQuery r c t
   -> StructureCondition r c
 (<>:) = EqCondition eqable NotEqOperator
 
 infix 4 <>:
 
-like_regex
-  :: StructureJsonValue r c ('JsonValueType n 'StringType)
+likeRegex
+  :: StructureQuery r c 'StructString
   -> T.Text
   -> StructureCondition r c
-like_regex v t = StringCondition v (StringLikeRegex t [])
+likeRegex v t = StringCondition v (StringLikeRegex t [])
 
-infix 4 `like_regex`
+infix 4 `likeRegex`
 
-starts_with
-  :: StructureJsonValue r c ('JsonValueType n 'StringType)
+startsWith
+  :: StructureQuery r c 'StructString
   -> T.Text
   -> StructureCondition r c
-starts_with v t = StringCondition v (StringStartsWith t)
+startsWith v t = StringCondition v (StringStartsWith t)
 
-infix 4 `starts_with`
+infix 4 `startsWith`
 
 (>:)
-  :: StructureJsonValue r c ('JsonValueType n1 'NumberType)
-  -> StructureJsonValue r c ('JsonValueType n2 'NumberType)
+  :: StructureQuery r c 'StructNumber
+  -> StructureQuery r c 'StructNumber
   -> StructureCondition r c
 (>:) = NumberCompareCondition NumberLT
 
 infix 4 >:
 
 (>=:)
-  :: StructureJsonValue r c ('JsonValueType n1 'NumberType)
-  -> StructureJsonValue r c ('JsonValueType n2 'NumberType)
+  :: StructureQuery r c 'StructNumber
+  -> StructureQuery r c 'StructNumber
   -> StructureCondition r c
 (>=:) = NumberCompareCondition NumberLE
 
 infix 4 >=:
 
 (<:)
-  :: StructureJsonValue r c ('JsonValueType n1 'NumberType)
-  -> StructureJsonValue r c ('JsonValueType n2 'NumberType)
+  :: StructureQuery r c 'StructNumber
+  -> StructureQuery r c 'StructNumber
   -> StructureCondition r c
 (<:) = NumberCompareCondition NumberGT
 
 infix 4 <:
 
 (<=:)
-  :: StructureJsonValue r c ('JsonValueType n1 'NumberType)
-  -> StructureJsonValue r c ('JsonValueType n2 'NumberType)
+  :: StructureQuery r c 'StructNumber
+  -> StructureQuery r c 'StructNumber
   -> StructureCondition r c
 (<=:) = NumberCompareCondition NumberGE
 
@@ -321,24 +338,24 @@ infix 4 <=:
 
 -- Value
 
-class JsonValueLiteral typ (n :: Nullable) (t :: JsonType) where
-  lit :: typ -> StructureJsonValue r c ('JsonValueType n t)
-instance JsonValueLiteral T.Text 'Strict 'StringType where
-  lit t = LiteralStringValue t
-instance JsonValueLiteral Scientific 'Strict 'NumberType where
-  lit v = LiteralNumberValue v
-instance JsonValueLiteral Bool 'Strict 'BooleanType where
-  lit v = LiteralBoolValue v
+-- class JsonValueLiteral typ (n :: Nullable) (t :: JsonType) where
+--   lit :: typ -> StructureJsonValue r c ('JsonValueType n t)
+-- instance JsonValueLiteral T.Text 'Strict 'StringType where
+--   lit t = LiteralStringValue t
+-- instance JsonValueLiteral Scientific 'Strict 'NumberType where
+--   lit v = LiteralNumberValue v
+-- instance JsonValueLiteral Bool 'Strict 'BooleanType where
+--   lit v = LiteralBoolValue v
 
-data Null = Null
+-- data Null = Null
 
-instance JsonValueLiteral Null 'Nullable t where
-  lit _ = LiteralNullValue
+-- instance JsonValueLiteral Null 'Nullable t where
+--   lit _ = LiteralNullValue
 
-query
-  :: StructureQuery r c ret
-  -> StructureJsonValue r c (StructValueType ret)
-query = QueryValue
+-- query
+--   :: StructureQuery r c ret
+--   -> StructureJsonValue r c (StructValueType ret)
+-- query = QueryValue
 
 -- typeOf
 --   :: StructureJsonValue r c t
@@ -386,22 +403,22 @@ query = QueryValue
 --   -> StructureJsonValue r c ('JsonValueType 'Strict t)
 -- filterStrict = FilterStrictValue
 
-class ToStructureJsonValue a r c t | a -> r c t where
-  toStructureJsonValue :: a -> StructureJsonValue r c t
-instance ToStructureJsonValue (StructureJsonValue r c t) r c t where
-  toStructureJsonValue = id
-instance (t ~ (StructValueType ret))
-  => ToStructureJsonValue (StructureQuery r c ret) r c t where
-  toStructureJsonValue = query
+-- class ToStructureJsonValue a r c t | a -> r c t where
+--   toStructureJsonValue :: a -> StructureJsonValue r c t
+-- instance ToStructureJsonValue (StructureJsonValue r c t) r c t where
+--   toStructureJsonValue = id
+-- instance (t ~ (StructValueType ret))
+--   => ToStructureJsonValue (StructureQuery r c ret) r c t where
+--   toStructureJsonValue = query
 
-(&:)
-  :: (ToStructureJsonValue a r c t)
-  => a
-  -> (StructureJsonValue r c t -> StructureJsonValue r c t2)
-  -> StructureJsonValue r c t2
-(&:) a f = f (toStructureJsonValue a)
+-- (&:)
+--   :: (ToStructureJsonValue a r c t)
+--   => a
+--   -> (StructureJsonValue r c t -> StructureJsonValue r c t2)
+--   -> StructureJsonValue r c t2
+-- (&:) a f = f (toStructureJsonValue a)
 
-infixl 7 &:
+-- infixl 7 &:
 
 -- Render
 
@@ -417,4 +434,4 @@ renderCondition
   . (Structural root)
   => StructureCondition (StructKind root) 'Nothing
   -> TL.Text
-renderCondition c = TB.toLazyText $ Render.renderCond c
+renderCondition c = TB.toLazyText $ Render.renderCondition c

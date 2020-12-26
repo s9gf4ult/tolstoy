@@ -57,6 +57,7 @@ data StructureQuery
     -> StructureQuery r c ret
   QueryRecursiveAnyField
     :: StructureRep ret
+    -> Maybe IndexRange
     -> StructureQuery r c inner
     -> StructureQuery r c ret
 

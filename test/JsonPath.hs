@@ -22,15 +22,15 @@ instance Structural Sub
 
 t :: TL.Text
 t = renderQuery @Rec $ root ?:
-  (ctx .: prodElem @"sub" .: prodElem @"string" &: id ==: textLit "hello")
+  (ctx .: prodElem @"sub" .: prodElem @"string" ==: textLit "hello")
 
 t3 :: TL.Text
 t3 = renderQuery @Rec $ root ?:
   (ctx
    .: prodElem @"sub"
-   ?: (ctx .: prodElem @"int" &: id >: numLit 10)
-   .: prodElem @"string" &: id ==: textLit "hello")
+   ?: (ctx .: prodElem @"int" >: numLit 10)
+   .: prodElem @"string"  ==: textLit "hello")
 
 t2 :: TL.Text
 t2 = renderQuery @[Rec] $ root .: vectorAny ?:
-  (ctx .: prodElem @"string" &: stringToDouble ==: numLit 10)
+  (ctx .: prodElem @"string" .: dotDouble ==: numLit 10)
