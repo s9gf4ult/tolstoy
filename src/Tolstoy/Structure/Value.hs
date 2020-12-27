@@ -20,6 +20,7 @@ data StructureValue :: Structure -> * where
   StringValue   :: !Text -> StructureValue 'StructString
   NumberValue   :: !Scientific -> StructureValue 'StructNumber
   BoolValue     :: !Bool -> StructureValue 'StructBool
+  NullValue     :: StructureValue 'StructNull
   OptionalValue
     :: !(Maybe (StructureValue s))
     -> StructureValue ('StructOptional s)

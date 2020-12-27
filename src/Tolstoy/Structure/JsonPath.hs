@@ -73,7 +73,7 @@ data Literal :: Structure -> * where
   LiteralString :: Text -> Literal 'StructString
   LiteralNumber :: Scientific -> Literal 'StructNumber
   LiteralBool :: Bool -> Literal 'StructBool
-  LiteralNull :: Literal ('StructOptional t)
+  LiteralNull :: Literal 'StructNull
 
 deriving instance Show (Literal s)
 
@@ -193,10 +193,10 @@ data StructureCondition
   -- objects it always returns "null", on arrays it returns
   -- "false". It always returns "false" on two different types
   EqCondition
-    :: Eqable s
+    :: Eqable a b
     -> EqOperator
-    -> StructureQuery r c s
-    -> StructureQuery r c s
+    -> StructureQuery r c a
+    -> StructureQuery r c b
     -> StructureCondition r c
   -- | "like_regex" or "starts with". Returns null on null input.
   StringCondition
@@ -216,13 +216,16 @@ data EqOperator = EqOperator | NotEqOperator
   deriving (Eq, Ord, Show, Generic)
 
 -- | Restriction of types for "==" operator
-data Eqable :: Structure -> * where
-  EqableString :: Eqable 'StructString
-  EqableNumber :: Eqable 'StructNumber
-  EqableBoolean :: Eqable 'StructBool
-  EqableOpt :: Eqable sub -> Eqable ('StructOptional sub)
+data Eqable :: Structure -> Structure -> * where
+  EqableString :: Eqable 'StructString 'StructString
+  EqableNumber :: Eqable 'StructNumber 'StructNumber
+  EqableBoolean :: Eqable 'StructBool 'StructBool
+  EqableNull :: Eqable 'StructNull 'StructNull
+  EqableNullOpt :: Eqable 'StructNull ('StructOptional sub)
+  EqableOptOpt :: Eqable a b -> Eqable ('StructOptional a) ('StructOptional b)
+  EqableCommut :: Eqable a b -> Eqable b a
 
-deriving instance Show (Eqable t)
+deriving instance Show (Eqable a b)
 
 -- -- | Values can be constructed from simple path, but also with some
 -- -- operators and methods. Values can be strict and optional. Optional

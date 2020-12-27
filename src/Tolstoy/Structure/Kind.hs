@@ -7,6 +7,7 @@ data Structure
   = StructString
   | StructNumber
   | StructBool
+  | StructNull
   | StructOptional Structure
   | StructVector Structure
   | StructSum SumTree

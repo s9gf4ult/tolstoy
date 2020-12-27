@@ -14,6 +14,7 @@ data StructureRep :: Structure -> * where
   StringRep   :: StructureRep StructString
   NumberRep   :: StructureRep StructNumber
   BoolRep     :: StructureRep StructBool
+  NullRep     :: StructureRep StructNull
   OptionalRep :: !(StructureRep s) -> StructureRep (StructOptional s)
   VectorRep   :: !(StructureRep s) -> StructureRep (StructVector s)
   SumRep      :: !(SumTreeRep t) -> StructureRep (StructSum t)
@@ -60,6 +61,7 @@ instance ToJSON (StructureRep s) where
         StringRep      -> "string"
         NumberRep      -> "number"
         BoolRep        -> "bool"
+        NullRep        -> "null"
         OptionalRep {} -> "optional"
         VectorRep {}   -> "vector"
         SumRep    {}   -> "sum"

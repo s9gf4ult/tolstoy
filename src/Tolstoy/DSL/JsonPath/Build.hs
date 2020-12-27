@@ -125,7 +125,7 @@ textLit = QueryLiteral . LiteralString
 boolLit :: Bool -> StructureQuery r c 'StructBool
 boolLit = QueryLiteral . LiteralBool
 
-nullLit :: StructureQuery r c ('StructOptional s)
+nullLit :: StructureQuery r c 'StructNull
 nullLit = QueryLiteral LiteralNull
 
 (+:)
@@ -259,30 +259,36 @@ infixr 3 &&:
 
 infixr 2 ||:
 
-class EqableClass (t :: Structure) where
-  eqable :: Eqable t
-instance EqableClass 'StructString where
+class EqableClass (a :: Structure) (b :: Structure) where
+  eqable :: Eqable a b
+instance EqableClass 'StructString 'StructString where
   eqable = EqableString
-instance EqableClass 'StructNumber where
+instance EqableClass 'StructNumber 'StructNumber where
   eqable = EqableNumber
-instance EqableClass 'StructBool where
+instance EqableClass 'StructBool 'StructBool where
   eqable = EqableBoolean
-instance (EqableClass sub) => EqableClass ('StructOptional sub) where
-  eqable = EqableOpt eqable
+instance EqableClass 'StructNull ('StructOptional s) where
+  eqable = EqableNullOpt
+instance EqableClass ('StructOptional s) 'StructNull where
+  eqable = EqableCommut EqableNullOpt
+instance (EqableClass a b)
+  => EqableClass ('StructOptional a) ('StructOptional b) where
+  eqable = EqableOptOpt eqable
+
 
 (==:)
-  :: (EqableClass t)
-  => StructureQuery r c t
-  -> StructureQuery r c t
+  :: (EqableClass a b)
+  => StructureQuery r c a
+  -> StructureQuery r c b
   -> StructureCondition r c
 (==:) = EqCondition eqable EqOperator
 
 infix 4 ==:
 
 (<>:)
-  :: (EqableClass t)
-  => StructureQuery r c t
-  -> StructureQuery r c t
+  :: (EqableClass a b)
+  => StructureQuery r c a
+  -> StructureQuery r c b
   -> StructureCondition r c
 (<>:) = EqCondition eqable NotEqOperator
 

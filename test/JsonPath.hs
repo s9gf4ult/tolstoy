@@ -10,6 +10,8 @@ data Rec = Rec
   { string :: Text
   , sub    :: Sub
   , int    :: Int
+  , may    :: Maybe Text
+  , maySub :: Maybe Sub
   } deriving (Eq, Ord, Show, Generic)
 
 instance Structural Rec
@@ -40,3 +42,11 @@ t4 :: TL.Text
 t4 = renderQuery @Rec
   $  root .: prodElem @"int"
   +: root .: prodElem @"sub" .: prodElem @"int"
+
+t5 :: TL.Text
+t5 = renderQuery @Rec
+  $ root ?: (ctx .: prodElem @"may" ==: nullLit)
+
+t6 :: TL.Text
+t6 = renderQuery @Rec
+  $ root ?: (ctx .: prodElem @"maySub" ==: nullLit)
