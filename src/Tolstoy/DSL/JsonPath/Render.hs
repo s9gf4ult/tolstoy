@@ -51,6 +51,7 @@ renderTypeFilter rep = " ? " <> wrapBrackets (typeFilter rep)
       StringRep -> typeIs "string"
       NumberRep -> typeIs "number"
       BoolRep -> typeIs "boolean"
+      NullRep -> typeIs "null"
       VectorRep _ -> typeIs "array"
       SumRep _ -> typeIs "object"
       ProductRep _ -> typeIs "object"

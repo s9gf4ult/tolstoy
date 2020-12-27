@@ -354,6 +354,9 @@ infix 4 <=:
 truthCondition :: StructureCondition r c
 truthCondition = boolLit True ==: boolLit True
 
+falseCondition :: StructureCondition r c
+falseCondition = boolLit True ==: boolLit False
+
 -- Render
 
 renderQuery
