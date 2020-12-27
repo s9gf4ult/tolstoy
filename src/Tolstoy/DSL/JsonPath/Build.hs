@@ -259,25 +259,43 @@ infixr 3 &&:
 
 infixr 2 ||:
 
-class EqableClass (a :: Structure) (b :: Structure) where
+class (final ~ EqFinal a b)
+  => EqableClass (a :: Structure) (b :: Structure) (final :: Bool) where
   eqable :: Eqable a b
-instance EqableClass 'StructString 'StructString where
+instance EqableClass 'StructString 'StructString 'True where
   eqable = EqableString
-instance EqableClass 'StructNumber 'StructNumber where
+instance EqableClass 'StructNumber 'StructNumber 'True where
   eqable = EqableNumber
-instance EqableClass 'StructBool 'StructBool where
+instance EqableClass 'StructBool 'StructBool 'True where
   eqable = EqableBoolean
-instance EqableClass 'StructNull ('StructOptional s) where
+instance EqableClass 'StructNull ('StructOptional s) 'True where
   eqable = EqableNullOpt
-instance EqableClass ('StructOptional s) 'StructNull where
+instance EqableClass ('StructOptional s) 'StructNull 'True where
   eqable = EqableCommut EqableNullOpt
-instance (EqableClass a b)
-  => EqableClass ('StructOptional a) ('StructOptional b) where
+instance (EqableClass a b (EqFinal a b))
+  => EqableClass ('StructOptional a) ('StructOptional b) 'False where
   eqable = EqableOptOpt eqable
+instance
+  ( EqableClass a sub (EqFinal a sub)
+  , 'False ~ (EqFinal a ('StructOptional sub))
+  ) => EqableClass a ('StructOptional sub) 'False where
+  eqable = EqableOpt eqable
+instance
+  ( EqableClass a sub (EqFinal a sub)
+  , 'False ~ EqFinal ('StructOptional sub) a
+  ) => EqableClass ('StructOptional sub) a 'False where
+  eqable = EqableCommut (EqableOpt eqable)
 
+type family EqFinal a b :: Bool where
+  EqFinal ('StructOptional a) ('StructOptional b) = False
+  EqFinal 'StructNull ('StructOptional a) = True
+  EqFinal ('StructOptional a) 'StructNull = True
+  EqFinal a ('StructOptional b) = False
+  EqFinal ('StructOptional a) b = False
+  EqFinal a a = True
 
 (==:)
-  :: (EqableClass a b)
+  :: (EqableClass a b (EqFinal a b))
   => StructureQuery r c a
   -> StructureQuery r c b
   -> StructureCondition r c
@@ -286,7 +304,7 @@ instance (EqableClass a b)
 infix 4 ==:
 
 (<>:)
-  :: (EqableClass a b)
+  :: (EqableClass a b (EqFinal a b))
   => StructureQuery r c a
   -> StructureQuery r c b
   -> StructureCondition r c

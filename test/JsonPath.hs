@@ -47,6 +47,18 @@ t5 :: TL.Text
 t5 = renderQuery @Rec
   $ root ?: (ctx .: prodElem @"may" ==: nullLit)
 
+t7 :: TL.Text
+t7 = renderQuery @Rec
+  $ root ?: (ctx .: prodElem @"may" ==: textLit "something")
+
+-- t8 :: TL.Text
+-- t8 = renderQuery @Rec
+--   $ root ?: (ctx .: prodElem @"maySub" ==: ctx .: prodElem @"sub")
+
+t9 :: TL.Text
+t9 = renderQuery @Rec
+  $ root ?: (ctx .: prodElem @"may" ==: ctx .: prodElem @"string")
+
 t6 :: TL.Text
 t6 = renderQuery @Rec
   $ root ?: (ctx .: prodElem @"maySub" ==: nullLit)

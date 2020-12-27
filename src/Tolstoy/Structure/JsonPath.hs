@@ -223,6 +223,7 @@ data Eqable :: Structure -> Structure -> * where
   EqableNull :: Eqable 'StructNull 'StructNull
   EqableNullOpt :: Eqable 'StructNull ('StructOptional sub)
   EqableOptOpt :: Eqable a b -> Eqable ('StructOptional a) ('StructOptional b)
+  EqableOpt :: Eqable a sub -> Eqable a ('StructOptional sub)
   EqableCommut :: Eqable a b -> Eqable b a
 
 deriving instance Show (Eqable a b)
