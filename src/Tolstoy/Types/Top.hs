@@ -9,6 +9,7 @@ import Data.UUID.Types
 import GHC.Generics (Generic)
 import Tolstoy.Structure
 import Tolstoy.Types.DB
+import Tolstoy.Types.Init
 
 type TolstoyResult = Either TolstoyError
 
@@ -59,7 +60,9 @@ data Tolstoy m doc act a = Tolstoy
   -- ^ Saves changed doc to the DB. Note that it does not check the
   -- document history consistency from the business logic perspective
   , listDocuments
-    :: Maybe (StructureCondition (StructKind doc) 'Nothing)
+    :: forall ret
+    .  ListDocuments doc ret
+    -- ^ Query returning literally any value
     -> m (TolstoyResult [DocDesc doc act])
   -- ^ Lists documents by condition
-  } deriving (Generic)
+  }

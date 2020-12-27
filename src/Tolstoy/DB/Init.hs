@@ -34,12 +34,18 @@ initQueries TolstoyTables{..} = TolstoyQueries
   }
   where
     documentsList' = $(sqlExpFile "documentsList")
-    documentsList mcond =
+    documentsList :: forall ret. ListDocuments doc ret -> SqlBuilder
+    documentsList doclist =
       [sqlExp|SELECT * FROM (^{documentsList'}) AS docs ^{wherecond}|]
       where
-        wherecond = case mcond of
-          Nothing        -> mempty
-          Just condition -> [sqlExp|WHERE document @@ #{condition}|]
+        wherecond = case doclist of
+          ListAll -> mempty
+          ByCondition cond ->
+            let condition = renderCondition @doc cond
+            in [sqlExp|WHERE document @@ #{condition}|]
+          ByQuery q ->
+            let query = renderQuery @doc q
+            in [sqlExp|WHERE document @? #{query}|]
     selectDocument docId = [sqlExp|
       SELECT * FROM (^{documentsList'}) AS docs
       WHERE document_id = #{docId}|]
@@ -306,8 +312,9 @@ tolstoyInit docMigrations actMigrations docAction queries = do
             , modified        = newMod }
         return (res, a)
     listDocuments
-      :: Maybe (StructureCondition (StructKind doc) 'Nothing)
+      :: forall ret
+      .  ListDocuments doc ret
       -> m (TolstoyResult [DocDesc doc act])
     listDocuments cond = do
-      raw <- pgQuery $ documentsList queries (renderCondition @doc <$> cond)
+      raw <- pgQuery $ documentsList queries cond
       return $ traverse (migrateDocDesc docMigMap actMigMap) raw
