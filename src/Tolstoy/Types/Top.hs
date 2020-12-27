@@ -7,6 +7,7 @@ import Data.Text as T
 import Data.Typeable
 import Data.UUID.Types
 import GHC.Generics (Generic)
+import Tolstoy.Structure
 import Tolstoy.Types.DB
 
 type TolstoyResult = Either TolstoyError
@@ -57,5 +58,8 @@ data Tolstoy m doc act a = Tolstoy
     -> m (TolstoyResult ((DocDesc doc act), a))
   -- ^ Saves changed doc to the DB. Note that it does not check the
   -- document history consistency from the business logic perspective
-  , listDocuments :: m (TolstoyResult [DocDesc doc act])
+  , listDocuments
+    :: Maybe (StructureCondition (StructKind doc) 'Nothing)
+    -> m (TolstoyResult [DocDesc doc act])
+  -- ^ Lists documents by condition
   } deriving (Generic)

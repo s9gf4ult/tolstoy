@@ -226,15 +226,6 @@ anyRecur
   -> StructureQuery r c (StructKind ret)
 anyRecur = QueryRecursiveAnyField structureRep
 
--- dotStarStar
---   :: Maybe IndexRange
---   -- ^ The level of nesting to traverse.
---   -> StructureQuery r c any
---   -- ^ The value to nest in
---   -> StructureJsonValue r c ('JsonValueType 'Nullable t2)
--- dotStarStar = RecursiveElementValue
-
-
 -- Condition
 
 cNot :: StructureCondition r c -> StructureCondition r c
@@ -360,89 +351,8 @@ infix 4 <:
 
 infix 4 <=:
 
--- Value
-
--- class JsonValueLiteral typ (n :: Nullable) (t :: JsonType) where
---   lit :: typ -> StructureJsonValue r c ('JsonValueType n t)
--- instance JsonValueLiteral T.Text 'Strict 'StringType where
---   lit t = LiteralStringValue t
--- instance JsonValueLiteral Scientific 'Strict 'NumberType where
---   lit v = LiteralNumberValue v
--- instance JsonValueLiteral Bool 'Strict 'BooleanType where
---   lit v = LiteralBoolValue v
-
--- data Null = Null
-
--- instance JsonValueLiteral Null 'Nullable t where
---   lit _ = LiteralNullValue
-
--- query
---   :: StructureQuery r c ret
---   -> StructureJsonValue r c (StructValueType ret)
--- query = QueryValue
-
--- typeOf
---   :: StructureJsonValue r c t
---   -> StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
--- typeOf = TypeOfValue
-
--- sizeOf
---   :: StructureJsonValue r c ('JsonValueType 'Strict 'ArrayType)
---   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
--- sizeOf = SizeOfValue
-
--- stringToDouble
---   :: StructureJsonValue r c ('JsonValueType 'Strict 'StringType)
---   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
--- stringToDouble = StringToDouble
-
--- ceiling
---   :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
---   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
--- ceiling = NumberMethodValue NumberCeiling
-
--- floor
---   :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
---   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
--- floor = NumberMethodValue NumberFloor
-
--- abs
---   :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
---   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
--- abs = NumberMethodValue NumberAbs
-
--- double
---   :: StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
---   -> StructureJsonValue r c ('JsonValueType 'Strict 'NumberType)
--- double = NumberMethodValue NumberDouble
-
--- filterType
---   :: JsonValueTypeRep ret
---   -> StructureJsonValue r c t
---   -> StructureJsonValue r c ret
--- filterType = FilterTypeValue
-
--- filterStrict
---   :: StructureJsonValue r c ('JsonValueType n t)
---   -> StructureJsonValue r c ('JsonValueType 'Strict t)
--- filterStrict = FilterStrictValue
-
--- class ToStructureJsonValue a r c t | a -> r c t where
---   toStructureJsonValue :: a -> StructureJsonValue r c t
--- instance ToStructureJsonValue (StructureJsonValue r c t) r c t where
---   toStructureJsonValue = id
--- instance (t ~ (StructValueType ret))
---   => ToStructureJsonValue (StructureQuery r c ret) r c t where
---   toStructureJsonValue = query
-
--- (&:)
---   :: (ToStructureJsonValue a r c t)
---   => a
---   -> (StructureJsonValue r c t -> StructureJsonValue r c t2)
---   -> StructureJsonValue r c t2
--- (&:) a f = f (toStructureJsonValue a)
-
--- infixl 7 &:
+truthCondition :: StructureCondition r c
+truthCondition = boolLit True ==: boolLit True
 
 -- Render
 

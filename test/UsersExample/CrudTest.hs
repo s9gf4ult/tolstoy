@@ -84,13 +84,13 @@ listAndChange t = do
   insertDescs <- for users $ \u -> do
     Right desc <- newDoc t u Init
     return desc
-  Right gotDescs <- listDocuments t
+  Right gotDescs <- listDocuments t Nothing
   let
     s1 = S.fromList insertDescs
     s2 = S.fromList gotDescs
   liftIO $ assertEqual "intersect 3" 3 (S.size $ S.intersection s1 s2)
   void $ changeDoc t (P.head insertDescs) Ban
-  Right newDocs <- listDocuments t
+  Right newDocs <- listDocuments t Nothing
   liftIO $ assertEqual "intersect 2" 2
     (S.size $ S.intersection s1 $ S.fromList newDocs)
 

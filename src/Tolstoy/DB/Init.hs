@@ -12,12 +12,14 @@ import           Data.Typeable
 import           Database.PostgreSQL.Query as PG
 import           GHC.Stack
 import           Prelude as P
+import           Tolstoy.DSL.JsonPath.Build
 import           Tolstoy.Migration
 import           Tolstoy.Structure
 import           Tolstoy.Types
 
 initQueries
-  :: (Structural doc, Structural act)
+  :: forall doc act
+  .  (Structural doc, Structural act)
   => TolstoyTables
   -> TolstoyQueries doc act
 initQueries TolstoyTables{..} = TolstoyQueries
@@ -31,9 +33,15 @@ initQueries TolstoyTables{..} = TolstoyQueries
   , setActionId
   }
   where
-    documentsList = $(sqlExpFile "documentsList")
+    documentsList' = $(sqlExpFile "documentsList")
+    documentsList mcond =
+      [sqlExp|SELECT * FROM (^{documentsList'}) AS docs ^{wherecond}|]
+      where
+        wherecond = case mcond of
+          Nothing        -> mempty
+          Just condition -> [sqlExp|WHERE document @@ #{condition}|]
     selectDocument docId = [sqlExp|
-      SELECT * FROM (^{documentsList}) AS docs
+      SELECT * FROM (^{documentsList'}) AS docs
       WHERE document_id = #{docId}|]
     insertVersions vs = [sqlExp|
       INSERT INTO ^{versionsTable} (doctype, "version", structure_rep)
@@ -297,6 +305,9 @@ tolstoyInit docMigrations actMigrations docAction queries = do
             , created         = docDesc ^. field @"created"
             , modified        = newMod }
         return (res, a)
-    listDocuments = do
-      raw <- pgQuery $ documentsList queries
+    listDocuments
+      :: Maybe (StructureCondition (StructKind doc) 'Nothing)
+      -> m (TolstoyResult [DocDesc doc act])
+    listDocuments cond = do
+      raw <- pgQuery $ documentsList queries (renderCondition @doc <$> cond)
       return $ traverse (migrateDocDesc docMigMap actMigMap) raw

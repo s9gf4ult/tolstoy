@@ -1,10 +1,11 @@
 module Tolstoy.Types.Init where
 
-import Data.List.NonEmpty (NonEmpty(..))
-import Data.Text as T
-import Database.PostgreSQL.Query
-import GHC.Generics (Generic)
-import Tolstoy.Types.DB
+import           Data.List.NonEmpty (NonEmpty(..))
+import           Data.Text as T
+import qualified Data.Text.Lazy as TL
+import           Database.PostgreSQL.Query
+import           GHC.Generics (Generic)
+import           Tolstoy.Types.DB
 
 type Error = Text
 
@@ -23,7 +24,7 @@ data TolstoyTables = TolstoyTables
   } deriving (Generic)
 
 data TolstoyQueries doc act = TolstoyQueries
-  { documentsList  :: SqlBuilder
+  { documentsList  :: Maybe TL.Text -> SqlBuilder
   -- ^ List of latest versions of documents. Response must be parsed
   -- as DocumentsListRaw
   , selectDocument :: DocId doc -> SqlBuilder
