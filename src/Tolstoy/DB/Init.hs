@@ -230,8 +230,13 @@ tolstoyInit docMigrations actMigrations docAction queries = do
         inserts = (versionToInsert Document <$> docReps)
           ++ (versionToInsert Action <$> actReps)
       return $ case NE.nonEmpty inserts of
-        Nothing -> Ready
-          Tolstoy { newDoc, getDoc, getDocHistory, changeDoc, listDocuments }
+        Nothing -> Ready $ Tolstoy
+          { newDoc
+          , getDoc
+          , getDocHistory
+          , changeDoc
+          , listDocuments
+          , listSubDocuments }
         Just ine -> InsertBeforeOperation ine
   return checkResult
   where
@@ -318,3 +323,5 @@ tolstoyInit docMigrations actMigrations docAction queries = do
     listDocuments cond = do
       raw <- pgQuery $ documentsList queries cond
       return $ traverse (migrateDocDesc docMigMap actMigMap) raw
+    listSubDocuments cond query
+      raw <- pgQuery $ documentsList

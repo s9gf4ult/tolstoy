@@ -35,6 +35,12 @@ data TolstoyQueries doc act = TolstoyQueries
   { documentsList  :: forall ret. ListDocuments doc ret -> SqlBuilder
   -- ^ List of latest versions of documents. Response must be parsed
   -- as DocumentsListRaw
+  , subDocumentsList
+    :: forall ret inner
+    .  ListDocuments doc inner
+    -> StructureQuery (StructKind doc) 'Nothing (StructKind ret)
+    -> SqlBuilder
+  -- ^ List document parts selected by queries
   , selectDocument :: DocId doc -> SqlBuilder
   -- ^ Selects single document. Response must be parsed as
   -- DocumentsListRaw

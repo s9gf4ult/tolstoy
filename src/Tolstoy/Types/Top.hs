@@ -65,4 +65,10 @@ data Tolstoy m doc act a = Tolstoy
     -- ^ Query returning literally any value
     -> m (TolstoyResult [DocDesc doc act])
   -- ^ Lists documents by condition
+  , listSubDocuments
+    :: forall result internal
+    . ListDocuments doc internal
+    -> StructureQuery (StructKind doc) 'Nothing (StructKind result)
+    -> m (TolstoyResult [DocDesc result act])
+    -- ^ Query to select from documents
   }
